@@ -1,6 +1,7 @@
 """BigQuery Table class for geasyp."""
 
-from typing import TYPE_CHECKING, Optional, Literal
+from typing import TYPE_CHECKING, Optional, Literal, Union
+from pathlib import Path
 import pandas as pd
 
 if TYPE_CHECKING:
@@ -86,53 +87,123 @@ class Table:
 
     def write(
         self,
-        data: pd.DataFrame,
+        data: Union[pd.DataFrame, str, Path, None],
         schema: Optional[dict[str, str]] = None,
         write_disposition: WriteDisposition = "WRITE_TRUNCATE",
+        source_format: Optional[str] = None,
+        skip_leading_rows: Optional[int] = None,
+        field_delimiter: Optional[str] = None,
     ) -> None:
-        """Write a DataFrame to the table.
+        """Write data to this table.
 
         Args:
-            data: DataFrame to write to the table.
+            data: One of the following:
+                - Pandas DataFrame
+                - File path (either a Path object or a string)
+                - None (to create an empty table with a schema)
             schema: Optional schema dictionary mapping column names to BigQuery types.
-                If None, schema is auto-detected from the DataFrame.
+                If None, schema is auto-detected.
                 Example: {"name": "STRING", "age": "INTEGER"}
             write_disposition: How to handle existing data:
                 - "WRITE_TRUNCATE": Overwrite existing data (default)
                 - "WRITE_APPEND": Append to existing data
                 - "WRITE_EMPTY": Only write if table is empty
+            source_format: File format (auto-detected from extension if None).
+                Only used when data is a file path.
+            skip_leading_rows: Number of header rows to skip (CSV only, default: 1 for CSV).
+                Only used when data is a file path.
+            field_delimiter: Field delimiter (CSV only, default: ',').
+                Only used when data is a file path.
 
         Raises:
             ValueError: If write_disposition is "WRITE_EMPTY" and table is not empty.
 
         Example:
+            >>> # Write DataFrame
             >>> df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [30, 25]})
             >>> table = client.dataset("my_dataset").table("my_table")
-            >>> table.write(df)  # Overwrites existing data
-            >>> table.write(df, write_disposition="WRITE_APPEND")  # Appends
+            >>> table.write(df)
+            >>>
+            >>> # Write from file
+            >>> table.write("data.csv")
+            >>>
+            >>> # Create empty table with schema
+            >>> table.write(None, schema={"name": "STRING", "age": "INTEGER"})
         """
         from google.cloud import bigquery
         from .schema import dict_to_schema_fields, dataframe_to_schema_fields
+        from .file_utils import detect_source_format, create_load_job_config
 
-        # Determine schema
-        if schema is not None:
+        # Handle None case (create empty table)
+        if data is None:
+            if schema is None:
+                raise ValueError("schema must be provided when data is None")
             schema_fields = dict_to_schema_fields(schema)
-        else:
-            schema_fields = dataframe_to_schema_fields(data)
+            table_ref = bigquery.Table(self.id, schema=schema_fields)
+            self._client.create_table(table_ref, exists_ok=True)
+            return
 
-        # Configure load job
-        job_config = bigquery.LoadJobConfig(
-            schema=schema_fields,
-            write_disposition=write_disposition,
+        # Handle file path case
+        if isinstance(data, (str, Path)):
+            file_path = Path(data) if isinstance(data, str) else data
+
+            # Detect source format if not provided
+            if source_format is None:
+                source_format = detect_source_format(file_path)
+
+            # Determine schema
+            if schema is not None:
+                schema_fields = dict_to_schema_fields(schema)
+                autodetect = False
+            else:
+                schema_fields = None
+                autodetect = True
+
+            # Create job config
+            job_config = create_load_job_config(
+                source_format=source_format,
+                schema=schema_fields,
+                write_disposition=write_disposition,
+                skip_leading_rows=skip_leading_rows,
+                field_delimiter=field_delimiter,
+                autodetect=autodetect,
+            )
+
+            # Load from file
+            with open(file_path, "rb") as source_file:
+                load_job = self._client.load_table_from_file(
+                    source_file, self.id, job_config=job_config
+                )
+                load_job.result()
+            return
+
+        # Handle DataFrame case
+        if isinstance(data, pd.DataFrame):
+            # Determine schema
+            if schema is not None:
+                schema_fields = dict_to_schema_fields(schema)
+            else:
+                schema_fields = dataframe_to_schema_fields(data)
+
+            # Configure load job
+            job_config = bigquery.LoadJobConfig(
+                schema=schema_fields,
+                write_disposition=write_disposition,
+            )
+
+            # Load data
+            load_job = self._client.load_table_from_dataframe(
+                data, self.id, job_config=job_config
+            )
+
+            # Wait for job to complete
+            load_job.result()
+            return
+
+        raise TypeError(
+            f"Unsupported data type: {type(data)}. "
+            "Expected DataFrame, file path (str/Path), or None."
         )
-
-        # Load data
-        load_job = self._client.load_table_from_dataframe(
-            data, self.id, job_config=job_config
-        )
-
-        # Wait for job to complete
-        load_job.result()
 
     def create(
         self,

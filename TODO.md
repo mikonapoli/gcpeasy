@@ -53,15 +53,15 @@
 - [x] Validate table_id formats (dataset.table vs project.dataset.table)
 - [x] Tests for CRUD operations
 
-## Slice 6: File Loading
+## Slice 6: File Loading ✓
 **Goal:** Load data from files (CSV, JSON, Parquet, etc.)
-- [ ] Add file format auto-detection
-- [ ] Add schema auto-detection for files
-- [ ] Extend `Client.load_data()` to support file paths
-- [ ] Extend `Table.write()` to support file paths
-- [ ] Support CSV, JSON, Parquet, Avro, ORC formats
-- [ ] Handle schema=None case for table creation
-- [ ] Tests for file loading
+- [x] Add file format auto-detection
+- [x] Add schema auto-detection for files
+- [x] Extend `Client.load_data()` to support file paths
+- [x] Extend `Table.write()` to support file paths
+- [x] Support CSV, JSON, Parquet, Avro, ORC formats
+- [x] Handle schema=None case for table creation
+- [x] Tests for file loading
 
 ## Slice 7: Metadata & Inspection
 **Goal:** Inspect and update table/dataset metadata

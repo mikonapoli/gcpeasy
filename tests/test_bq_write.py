@@ -264,7 +264,7 @@ class TestClientLoadData:
         client = init()
         df = pd.DataFrame({"name": ["Alice"], "age": [30]})
 
-        client.load_data("my_dataset.my_table", df)
+        client.load_data(df, "my_dataset.my_table")
 
         # Verify load was called with correct table ID
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
@@ -283,7 +283,7 @@ class TestClientLoadData:
         client = init()
         df = pd.DataFrame({"name": ["Alice"]})
 
-        client.load_data("other-project.my_dataset.my_table", df)
+        client.load_data(df, "other-project.my_dataset.my_table")
 
         # Verify correct table ID (should use "test-project")
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
@@ -302,7 +302,7 @@ class TestClientLoadData:
         client = init()
         df = pd.DataFrame({"name": ["Alice"]})
 
-        client.load_data("my_dataset.my_table", df, write_disposition="WRITE_APPEND")
+        client.load_data(df, "my_dataset.my_table", write_disposition="WRITE_APPEND")
 
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         job_config = call_args[1]["job_config"]
@@ -322,7 +322,7 @@ class TestClientLoadData:
         df = pd.DataFrame({"name": ["Alice"]})
         schema = {"name": "STRING"}
 
-        client.load_data("my_dataset.my_table", df, schema=schema)
+        client.load_data(df, "my_dataset.my_table", schema=schema)
 
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         job_config = call_args[1]["job_config"]
@@ -338,4 +338,4 @@ class TestClientLoadData:
         df = pd.DataFrame({"name": ["Alice"]})
 
         with pytest.raises(ValueError, match="Invalid table_id format"):
-            client.load_data("invalid_format", df)
+            client.load_data(df, "invalid_format")

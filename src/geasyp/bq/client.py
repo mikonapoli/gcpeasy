@@ -1,6 +1,7 @@
 """BigQuery client for geasyp."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
+from pathlib import Path
 import pandas as pd
 from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig
@@ -140,26 +141,44 @@ class Client:
 
     def load_data(
         self,
+        data: Union[pd.DataFrame, str, Path, None],
         table_id: str,
-        data: pd.DataFrame,
         schema: Optional[dict[str, str]] = None,
-        write_disposition: str = "WRITE_TRUNCATE",
+        source_format: Optional[str] = None,
+        write_disposition: str = "WRITE_APPEND",
+        skip_leading_rows: Optional[int] = None,
+        field_delimiter: Optional[str] = None,
     ) -> None:
-        """Load data from a DataFrame to a table (convenience method).
+        """Load data into a BigQuery table.
 
         Args:
-            table_id: Fully qualified table ID or "dataset.table" format.
-                If not fully qualified, uses the client's project.
-            data: DataFrame to load.
-            schema: Optional schema dictionary. If None, auto-detected from DataFrame.
+            data: One of the following:
+                - Path to file (CSV, JSON, Parquet, Avro, ORC)
+                - String that can be converted to a Path to a file
+                - A Pandas DataFrame
+                - None (To just create a new table with a schema)
+            table_id: Target table ID (format: `dataset.table` or `project.dataset.table`)
+            schema: Table schema as dict where keys are field names and values are type strings
+                (e.g., `{"name": "STRING", "age": "INTEGER"}`). Auto-detected if None and possible.
+            source_format: File format (auto-detected from extension if None)
             write_disposition: How to handle existing data:
-                - "WRITE_TRUNCATE": Overwrite existing data (default)
-                - "WRITE_APPEND": Append to existing data
+                - "WRITE_APPEND": Append to existing data (default)
+                - "WRITE_TRUNCATE": Overwrite existing data
                 - "WRITE_EMPTY": Only write if table is empty
+            skip_leading_rows: Number of header rows to skip (CSV only, default: 1 for CSV)
+            field_delimiter: Field delimiter (CSV only, default: ',')
 
         Example:
+            >>> # Load from DataFrame
             >>> df = pd.DataFrame({"name": ["Alice"], "age": [30]})
-            >>> client.load_data("my_dataset.my_table", df)
+            >>> client.load_data(df, "my_dataset.my_table")
+            >>>
+            >>> # Load from file
+            >>> client.load_data("data.csv", "my_dataset.my_table")
+            >>>
+            >>> # Create empty table with schema
+            >>> schema = {"name": "STRING", "age": "INTEGER"}
+            >>> client.load_data(None, "my_dataset.my_table", schema=schema)
         """
         # Parse table_id
         parts = table_id.split(".")
@@ -174,7 +193,14 @@ class Client:
             )
 
         table = self.dataset(dataset_id).table(table_name)
-        table.write(data, schema=schema, write_disposition=write_disposition)  # type: ignore
+        table.write(
+            data,  # type: ignore
+            schema=schema,
+            write_disposition=write_disposition,
+            source_format=source_format,
+            skip_leading_rows=skip_leading_rows,
+            field_delimiter=field_delimiter,
+        )
 
 
 def init(
