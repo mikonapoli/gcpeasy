@@ -51,12 +51,11 @@ class TestTableWrite:
     """Tests for Table.write() method."""
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_table_write_with_auto_schema(self, mock_bq_client):
-        """Test writing DataFrame with auto-detected schema."""
+    def test_write_should_call_gcp_load_table_from_dataframe(self, mock_bq_client):
+        """Test that write() calls GCP client's load method."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
 
-        # Setup mock load job
         mock_job = Mock()
         mock_job.result.return_value = None
         mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
@@ -67,27 +66,107 @@ class TestTableWrite:
 
         table.write(df)
 
-        # Verify load was called
         mock_bq_client.return_value.load_table_from_dataframe.assert_called_once()
-        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
 
-        # Check DataFrame was passed
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_write_should_pass_dataframe_to_gcp_client(self, mock_bq_client):
+        """Test that write() passes DataFrame to GCP client."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+
+        table.write(df)
+
+        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         pd.testing.assert_frame_equal(call_args[0][0], df)
 
-        # Check table ID
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_write_should_use_fully_qualified_table_id(self, mock_bq_client):
+        """Test that write() uses correct table ID."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+
+        table.write(df)
+
+        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         assert call_args[0][1] == "test-project.my_dataset.my_table"
 
-        # Check job config
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_write_should_default_to_write_truncate_disposition(self, mock_bq_client):
+        """Test that write() uses WRITE_TRUNCATE by default."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+
+        table.write(df)
+
+        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         job_config = call_args[1]["job_config"]
         assert job_config.write_disposition == "WRITE_TRUNCATE"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_write_with_auto_schema_should_infer_schema_from_dataframe(self, mock_bq_client):
+        """Test that write() without schema infers it from DataFrame."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+
+        table.write(df)
+
+        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
+        job_config = call_args[1]["job_config"]
         assert len(job_config.schema) == 2
 
-        # Verify job result was called (waits for completion)
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_write_should_wait_for_job_completion(self, mock_bq_client):
+        """Test that write() waits for load job to complete."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+
+        table.write(df)
+
         mock_job.result.assert_called_once()
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_table_write_with_explicit_schema(self, mock_bq_client):
-        """Test writing DataFrame with explicit schema."""
+    def test_write_with_schema_should_use_provided_schema(self, mock_bq_client):
+        """Test that write() with schema parameter uses it."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
 
@@ -102,10 +181,29 @@ class TestTableWrite:
 
         table.write(df, schema=schema)
 
-        # Verify schema was used
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         job_config = call_args[1]["job_config"]
         assert len(job_config.schema) == 2
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_write_with_schema_should_convert_dict_to_schema_fields(self, mock_bq_client):
+        """Test that write() converts schema dict to SchemaField objects."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+        schema = {"name": "STRING", "age": "INT64"}
+
+        table.write(df, schema=schema)
+
+        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
+        job_config = call_args[1]["job_config"]
         assert job_config.schema[0].name == "name"
         assert job_config.schema[0].field_type == "STRING"
 
@@ -173,8 +271,8 @@ class TestClientLoadData:
         assert call_args[0][1] == "test-project.my_dataset.my_table"
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_load_data_with_full_table_id(self, mock_bq_client):
-        """Test load_data with fully qualified table ID."""
+    def test_load_data_with_full_table_id_should_override_with_client_project(self, mock_bq_client):
+        """Test load_data uses client's project even when full ID provided."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
 
@@ -187,13 +285,32 @@ class TestClientLoadData:
 
         client.load_data("other-project.my_dataset.my_table", df)
 
-        # Verify correct table ID (should use "other-project")
+        # Verify correct table ID (should use "test-project")
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         assert call_args[0][1] == "test-project.my_dataset.my_table"  # Uses client's project
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_load_data_with_schema_and_disposition(self, mock_bq_client):
-        """Test load_data with schema and write_disposition."""
+    def test_load_data_with_write_disposition_should_pass_it_to_job_config(self, mock_bq_client):
+        """Test that load_data passes write_disposition to job config."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+
+        mock_job = Mock()
+        mock_job.result.return_value = None
+        mock_bq_client.return_value.load_table_from_dataframe.return_value = mock_job
+
+        client = init()
+        df = pd.DataFrame({"name": ["Alice"]})
+
+        client.load_data("my_dataset.my_table", df, write_disposition="WRITE_APPEND")
+
+        call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
+        job_config = call_args[1]["job_config"]
+        assert job_config.write_disposition == "WRITE_APPEND"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_load_data_with_schema_should_pass_it_to_job_config(self, mock_bq_client):
+        """Test that load_data passes schema to job config."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
 
@@ -205,17 +322,10 @@ class TestClientLoadData:
         df = pd.DataFrame({"name": ["Alice"]})
         schema = {"name": "STRING"}
 
-        client.load_data(
-            "my_dataset.my_table",
-            df,
-            schema=schema,
-            write_disposition="WRITE_APPEND"
-        )
+        client.load_data("my_dataset.my_table", df, schema=schema)
 
-        # Verify schema and disposition were passed through
         call_args = mock_bq_client.return_value.load_table_from_dataframe.call_args
         job_config = call_args[1]["job_config"]
-        assert job_config.write_disposition == "WRITE_APPEND"
         assert len(job_config.schema) == 1
 
     @patch("geasyp.bq.client.bigquery.Client")

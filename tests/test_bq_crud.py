@@ -12,8 +12,51 @@ class TestDatasetCreate:
     """Tests for Dataset.create() method."""
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_dataset_create_basic(self, mock_bq_client):
-        """Test basic dataset creation."""
+    def test_dataset_create_should_call_gcp_create_dataset(self, mock_bq_client):
+        """Test that create() calls GCP client's create_dataset."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_dataset.return_value = Mock()
+
+        client = init()
+        dataset = client.dataset("my_dataset")
+        dataset.create()
+
+        mock_bq_client.return_value.create_dataset.assert_called_once()
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_dataset_create_should_use_correct_dataset_id(self, mock_bq_client):
+        """Test that create() uses correct dataset_id."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_dataset.return_value = Mock()
+
+        client = init()
+        dataset = client.dataset("my_dataset")
+        dataset.create()
+
+        call_args = mock_bq_client.return_value.create_dataset.call_args
+        dataset_obj = call_args[0][0]
+        assert dataset_obj.dataset_id == "my_dataset"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_dataset_create_should_use_client_project(self, mock_bq_client):
+        """Test that create() uses client's project."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_dataset.return_value = Mock()
+
+        client = init()
+        dataset = client.dataset("my_dataset")
+        dataset.create()
+
+        call_args = mock_bq_client.return_value.create_dataset.call_args
+        dataset_obj = call_args[0][0]
+        assert dataset_obj.project == "test-project"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_dataset_create_should_return_self_for_chaining(self, mock_bq_client):
+        """Test that create() returns self to allow method chaining."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
         mock_bq_client.return_value.create_dataset.return_value = Mock()
@@ -22,36 +65,51 @@ class TestDatasetCreate:
         dataset = client.dataset("my_dataset")
         result = dataset.create()
 
-        # Verify create_dataset was called
-        mock_bq_client.return_value.create_dataset.assert_called_once()
-        call_args = mock_bq_client.return_value.create_dataset.call_args
-        dataset_obj = call_args[0][0]
-
-        # BigQuery Dataset object has reference properties
-        assert dataset_obj.dataset_id == "my_dataset"
-        assert dataset_obj.project == "test-project"
-        assert result is dataset  # Returns self for chaining
+        assert result is dataset
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_dataset_create_with_options(self, mock_bq_client):
-        """Test dataset creation with description and expiration."""
+    def test_dataset_create_with_location_should_set_location(self, mock_bq_client):
+        """Test that create() with location parameter sets location."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
         mock_bq_client.return_value.create_dataset.return_value = Mock()
 
         client = init()
         dataset = client.dataset("my_dataset")
-        dataset.create(
-            location="US",
-            description="Test dataset",
-            default_table_expiration_ms=86400000,  # 1 day
-        )
+        dataset.create(location="US")
 
         call_args = mock_bq_client.return_value.create_dataset.call_args
         dataset_obj = call_args[0][0]
-
         assert dataset_obj.location == "US"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_dataset_create_with_description_should_set_description(self, mock_bq_client):
+        """Test that create() with description sets description."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_dataset.return_value = Mock()
+
+        client = init()
+        dataset = client.dataset("my_dataset")
+        dataset.create(description="Test dataset")
+
+        call_args = mock_bq_client.return_value.create_dataset.call_args
+        dataset_obj = call_args[0][0]
         assert dataset_obj.description == "Test dataset"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_dataset_create_with_expiration_should_set_table_expiration(self, mock_bq_client):
+        """Test that create() with expiration sets default table expiration."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_dataset.return_value = Mock()
+
+        client = init()
+        dataset = client.dataset("my_dataset")
+        dataset.create(default_table_expiration_ms=86400000)
+
+        call_args = mock_bq_client.return_value.create_dataset.call_args
+        dataset_obj = call_args[0][0]
         assert dataset_obj.default_table_expiration_ms == 86400000
 
     @patch("geasyp.bq.client.bigquery.Client")
@@ -89,8 +147,8 @@ class TestDatasetDelete:
     """Tests for Dataset.delete() method."""
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_dataset_delete_basic(self, mock_bq_client):
-        """Test basic dataset deletion."""
+    def test_dataset_delete_should_call_gcp_with_default_parameters(self, mock_bq_client):
+        """Test basic dataset deletion with default parameters."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
         mock_bq_client.return_value.delete_dataset.return_value = None
@@ -153,8 +211,86 @@ class TestTableCreate:
     """Tests for Table.create() method."""
 
     @patch("geasyp.bq.client.bigquery.Client")
-    def test_table_create_basic(self, mock_bq_client):
-        """Test basic table creation."""
+    def test_table_create_should_call_gcp_create_table(self, mock_bq_client):
+        """Test that create() calls GCP client's create_table."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_table.return_value = Mock()
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        schema = {"name": "STRING", "age": "INT64"}
+        table.create(schema)
+
+        mock_bq_client.return_value.create_table.assert_called_once()
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_table_create_should_set_correct_table_id(self, mock_bq_client):
+        """Test that create() sets correct table_id."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_table.return_value = Mock()
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        schema = {"name": "STRING", "age": "INT64"}
+        table.create(schema)
+
+        call_args = mock_bq_client.return_value.create_table.call_args
+        table_obj = call_args[0][0]
+        assert table_obj.table_id == "my_table"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_table_create_should_set_correct_dataset_id(self, mock_bq_client):
+        """Test that create() sets correct dataset_id."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_table.return_value = Mock()
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        schema = {"name": "STRING", "age": "INT64"}
+        table.create(schema)
+
+        call_args = mock_bq_client.return_value.create_table.call_args
+        table_obj = call_args[0][0]
+        assert table_obj.dataset_id == "my_dataset"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_table_create_should_use_client_project(self, mock_bq_client):
+        """Test that create() sets correct project."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_table.return_value = Mock()
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        schema = {"name": "STRING", "age": "INT64"}
+        table.create(schema)
+
+        call_args = mock_bq_client.return_value.create_table.call_args
+        table_obj = call_args[0][0]
+        assert table_obj.project == "test-project"
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_table_create_should_convert_schema_dict_to_fields(self, mock_bq_client):
+        """Test that create() converts schema dict to SchemaField objects."""
+        mock_bq_client.return_value.project = "test-project"
+        mock_bq_client.return_value.location = "EU"
+        mock_bq_client.return_value.create_table.return_value = Mock()
+
+        client = init()
+        table = client.dataset("my_dataset").table("my_table")
+        schema = {"name": "STRING", "age": "INT64"}
+        table.create(schema)
+
+        call_args = mock_bq_client.return_value.create_table.call_args
+        table_obj = call_args[0][0]
+        assert len(table_obj.schema) == 2
+
+    @patch("geasyp.bq.client.bigquery.Client")
+    def test_table_create_should_return_self_for_chaining(self, mock_bq_client):
+        """Test that create() returns self to allow method chaining."""
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
         mock_bq_client.return_value.create_table.return_value = Mock()
@@ -164,17 +300,7 @@ class TestTableCreate:
         schema = {"name": "STRING", "age": "INT64"}
         result = table.create(schema)
 
-        # Verify create_table was called
-        mock_bq_client.return_value.create_table.assert_called_once()
-        call_args = mock_bq_client.return_value.create_table.call_args
-        table_obj = call_args[0][0]
-
-        # BigQuery Table object has reference properties
-        assert table_obj.table_id == "my_table"
-        assert table_obj.dataset_id == "my_dataset"
-        assert table_obj.project == "test-project"
-        assert len(table_obj.schema) == 2
-        assert result is table  # Returns self for chaining
+        assert result is table
 
     @patch("geasyp.bq.client.bigquery.Client")
     def test_table_create_with_partitioning(self, mock_bq_client):
