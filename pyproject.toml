@@ -1,0 +1,14 @@
+[project]
+name = "geasyp"
+version = "0.1.0"
+description = "GCP, but easy"
+readme = "README.md"
+authors = [
+    { name = "mikonapoli", email = "michelangelo.bucci@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
