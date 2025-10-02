@@ -100,6 +100,7 @@ class Table:
             data: One of the following:
                 - Pandas DataFrame
                 - File path (either a Path object or a string)
+                - GCS URI (string starting with "gs://")
                 - None (to create an empty table with a schema)
             schema: Optional schema dictionary mapping column names to BigQuery types.
                 If None, schema is auto-detected.
@@ -109,11 +110,11 @@ class Table:
                 - "WRITE_APPEND": Append to existing data
                 - "WRITE_EMPTY": Only write if table is empty
             source_format: File format (auto-detected from extension if None).
-                Only used when data is a file path.
+                Only used when data is a file path or GCS URI.
             skip_leading_rows: Number of header rows to skip (CSV only, default: 1 for CSV).
-                Only used when data is a file path.
+                Only used when data is a file path or GCS URI.
             field_delimiter: Field delimiter (CSV only, default: ',').
-                Only used when data is a file path.
+                Only used when data is a file path or GCS URI.
 
         Raises:
             ValueError: If write_disposition is "WRITE_EMPTY" and table is not empty.
@@ -126,6 +127,9 @@ class Table:
             >>>
             >>> # Write from file
             >>> table.write("data.csv")
+            >>>
+            >>> # Write from GCS
+            >>> table.write("gs://my-bucket/data.csv")
             >>>
             >>> # Create empty table with schema
             >>> table.write(None, schema={"name": "STRING", "age": "INTEGER"})
@@ -143,8 +147,57 @@ class Table:
             self._client.create_table(table_ref, exists_ok=True)
             return
 
-        # Handle file path case
+        # Handle file path or GCS URI case
         if isinstance(data, (str, Path)):
+            data_str = str(data)
+
+            # Check if it's a GCS URI
+            if data_str.startswith("gs://"):
+                # Handle GCS URI
+                if source_format is None:
+                    # Try to detect from URI extension
+                    if data_str.endswith(".csv"):
+                        source_format = "CSV"
+                    elif data_str.endswith((".json", ".jsonl", ".ndjson")):
+                        source_format = "NEWLINE_DELIMITED_JSON"
+                    elif data_str.endswith(".parquet"):
+                        source_format = "PARQUET"
+                    elif data_str.endswith(".avro"):
+                        source_format = "AVRO"
+                    elif data_str.endswith(".orc"):
+                        source_format = "ORC"
+                    else:
+                        raise ValueError(
+                            f"Cannot detect format from GCS URI: {data_str}. "
+                            "Please provide source_format parameter."
+                        )
+
+                # Determine schema
+                if schema is not None:
+                    schema_fields = dict_to_schema_fields(schema)
+                    autodetect = False
+                else:
+                    schema_fields = None
+                    autodetect = True
+
+                # Create job config
+                job_config = create_load_job_config(
+                    source_format=source_format,
+                    schema=schema_fields,
+                    write_disposition=write_disposition,
+                    skip_leading_rows=skip_leading_rows,
+                    field_delimiter=field_delimiter,
+                    autodetect=autodetect,
+                )
+
+                # Load from GCS
+                load_job = self._client.load_table_from_uri(
+                    data_str, self.id, job_config=job_config
+                )
+                load_job.result()
+                return
+
+            # Handle local file path
             file_path = Path(data) if isinstance(data, str) else data
 
             # Detect source format if not provided
@@ -365,3 +418,117 @@ class Table:
             self._client.update_table(table_ref, fields_to_update)
 
         return self
+
+    def insert(
+        self,
+        rows: list[dict],
+        ignore_unknown_values: bool = True,
+        skip_invalid_rows: bool = False,
+    ) -> list:
+        """Stream insert rows into this table (for real-time ingestion).
+
+        Args:
+            rows: List of dicts representing rows to insert.
+                Example: [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
+            ignore_unknown_values: Ignore row values not in schema.
+            skip_invalid_rows: Skip rows with invalid data.
+
+        Returns:
+            List of errors (empty if all rows inserted successfully).
+
+        Example:
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> errors = table.insert([
+            ...     {"name": "Alice", "age": 30},
+            ...     {"name": "Bob", "age": 25}
+            ... ])
+            >>> if not errors:
+            ...     print("All rows inserted successfully")
+        """
+        errors = self._client.insert_rows_json(
+            self.id,
+            rows,
+            ignore_unknown_values=ignore_unknown_values,
+            skip_invalid_rows=skip_invalid_rows,
+        )
+        return errors
+
+    def to_gcs(
+        self,
+        destination_uri: str,
+        export_format: str = "CSV",
+        compression: str = "GZIP",
+        print_header: bool = True,
+        field_delimiter: str = ",",
+    ) -> "bigquery.ExtractJob":
+        """Export this table to Google Cloud Storage.
+
+        Args:
+            destination_uri: GCS destination URI (e.g., `gs://bucket/path/*.csv`)
+            export_format: Export format: `CSV`, `NEWLINE_DELIMITED_JSON`, `AVRO`, `PARQUET`
+            compression: Compression: `NONE`, `GZIP`, `SNAPPY` (Avro/Parquet only)
+            print_header: Include header row (CSV only)
+            field_delimiter: Field delimiter (CSV only)
+
+        Returns:
+            Extract job result.
+
+        Example:
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> job = table.to_gcs("gs://my-bucket/exports/*.csv", export_format="CSV")
+            >>> job.result()  # Wait for completion
+        """
+        from google.cloud import bigquery
+
+        job_config = bigquery.ExtractJobConfig()
+        job_config.destination_format = export_format
+        job_config.compression = compression
+
+        if export_format == "CSV":
+            job_config.print_header = print_header
+            job_config.field_delimiter = field_delimiter
+
+        extract_job = self._client.extract_table(
+            self.id, destination_uri, job_config=job_config
+        )
+
+        return extract_job
+
+    def copy(
+        self,
+        destination_table: Union[str, "Table"],
+        write_disposition: WriteDisposition = "WRITE_TRUNCATE",
+    ) -> "bigquery.CopyJob":
+        """Copy this table to another location.
+
+        Args:
+            destination_table: Destination Table object or table ID string.
+                If string, should be in format "dataset.table" or "project.dataset.table"
+            write_disposition: How to handle existing destination table:
+                - "WRITE_TRUNCATE": Overwrite destination (default)
+                - "WRITE_APPEND": Append to destination
+                - "WRITE_EMPTY": Only write if destination is empty
+
+        Returns:
+            Copy job result.
+
+        Example:
+            >>> source = client.dataset("my_dataset").table("my_table")
+            >>> dest = client.dataset("my_dataset").table("my_table_copy")
+            >>> job = source.copy(dest)
+            >>> job.result()  # Wait for completion
+        """
+        from google.cloud import bigquery
+
+        # Get destination table ID
+        if isinstance(destination_table, str):
+            dest_id = destination_table
+        else:
+            dest_id = destination_table.id
+
+        job_config = bigquery.CopyJobConfig()
+        job_config.write_disposition = write_disposition
+
+        copy_job = self._client.copy_table(self.id, dest_id, job_config=job_config)
+
+        return copy_job

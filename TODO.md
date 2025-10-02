@@ -72,10 +72,10 @@
 - [x] Add `Table.update()` for schema, description, labels
 - [x] Tests for metadata operations
 
-## Slice 8: Advanced Operations
+## Slice 8: Advanced Operations ✓
 **Goal:** Streaming inserts, exports, and table copying
-- [ ] Add `Table.insert()` for streaming inserts
-- [ ] Add `Table.to_gcs()` export with format options
-- [ ] Add `Table.copy()` for table copying
-- [ ] Extend `Table.write()` to support GCS URIs
-- [ ] Tests for advanced operations
+- [x] Add `Table.insert()` for streaming inserts
+- [x] Add `Table.to_gcs()` export with format options
+- [x] Add `Table.copy()` for table copying
+- [x] Extend `Table.write()` to support GCS URIs
+- [x] Tests for advanced operations
