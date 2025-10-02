@@ -88,6 +88,56 @@ class Client:
         # Convert results to DataFrame
         return query_job.to_dataframe()
 
+    def datasets(self) -> list[str]:
+        """List all datasets in the project.
+
+        Returns:
+            List of dataset IDs (without project prefix).
+
+        Example:
+            >>> client = init()
+            >>> datasets = client.datasets()
+            >>> print(datasets)
+            ['dataset1', 'dataset2']
+        """
+        datasets = self._gcp.list_datasets()
+        return [dataset.dataset_id for dataset in datasets]
+
+    def dataset(self, dataset_id: str) -> "Dataset":
+        """Get a Dataset object for a specific dataset.
+
+        Args:
+            dataset_id: The dataset ID (without project prefix).
+
+        Returns:
+            Dataset object for the specified dataset.
+
+        Example:
+            >>> client = init()
+            >>> dataset = client.dataset("my_dataset")
+            >>> tables = dataset.tables()
+        """
+        from .dataset import Dataset
+
+        return Dataset(self._gcp, dataset_id, self.project_id)
+
+    def tables(self, dataset_id: str) -> list[str]:
+        """List all tables in a dataset (convenience method).
+
+        Args:
+            dataset_id: The dataset ID (without project prefix).
+
+        Returns:
+            List of table IDs (without project or dataset prefix).
+
+        Example:
+            >>> client = init()
+            >>> tables = client.tables("my_dataset")
+            >>> print(tables)
+            ['table1', 'table2']
+        """
+        return self.dataset(dataset_id).tables()
+
 
 def init(
     project_id: Optional[str] = None,

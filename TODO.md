@@ -12,16 +12,16 @@
 - [x] Type hints and docstrings
 - [x] Basic tests
 
-## Slice 2: Dataset Discovery & Navigation
+## Slice 2: Dataset Discovery & Navigation ✓
 **Goal:** List and access datasets and tables
-- [ ] Implement `Dataset` class with `id` property
-- [ ] Add `Client.datasets()` to list all datasets
-- [ ] Add `Client.dataset(name)` to get Dataset object
-- [ ] Add `Dataset.exists()` method
-- [ ] Add `Dataset.tables()` to list tables
-- [ ] Add `Client.tables(dataset_id)` convenience method
-- [ ] Type hints and docstrings
-- [ ] Tests for listing/navigation
+- [x] Implement `Dataset` class with `id` property
+- [x] Add `Client.datasets()` to list all datasets
+- [x] Add `Client.dataset(name)` to get Dataset object
+- [x] Add `Dataset.exists()` method
+- [x] Add `Dataset.tables()` to list tables
+- [x] Add `Client.tables(dataset_id)` convenience method
+- [x] Type hints and docstrings
+- [x] Tests for listing/navigation
 
 ## Slice 3: Table Reading
 **Goal:** Read table data into DataFrames
