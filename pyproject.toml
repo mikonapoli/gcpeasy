@@ -7,7 +7,17 @@ authors = [
     { name = "mikonapoli", email = "michelangelo.bucci@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "google-cloud-bigquery",
+    "pandas",
+    "db-dtypes",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-mock",
+]
 
 [build-system]
 requires = ["hatchling"]

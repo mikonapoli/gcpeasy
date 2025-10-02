@@ -1,3 +1,5 @@
 """BigQuery utilities for geasyp."""
 
-__all__ = []
+from .client import Client, init
+
+__all__ = ["Client", "init"]
