@@ -49,3 +49,14 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+
+# START Ruler Generated Files
+/.cursor/rules/ruler_cursor_instructions.mdc
+/.cursor/rules/ruler_cursor_instructions.mdc.bak
+/CLAUDE.md
+/CLAUDE.md.bak
+# END Ruler Generated Files
+
+API*.md
+*API*.ipynb
