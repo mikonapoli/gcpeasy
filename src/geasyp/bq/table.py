@@ -1,10 +1,12 @@
 """BigQuery Table class for geasyp."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Literal
 import pandas as pd
 
 if TYPE_CHECKING:
     from google.cloud import bigquery
+
+WriteDisposition = Literal["WRITE_TRUNCATE", "WRITE_APPEND", "WRITE_EMPTY"]
 
 
 class Table:
@@ -81,3 +83,53 @@ class Table:
 
         query_job = self._client.query(query)
         return query_job.to_dataframe()
+
+    def write(
+        self,
+        data: pd.DataFrame,
+        schema: Optional[dict[str, str]] = None,
+        write_disposition: WriteDisposition = "WRITE_TRUNCATE",
+    ) -> None:
+        """Write a DataFrame to the table.
+
+        Args:
+            data: DataFrame to write to the table.
+            schema: Optional schema dictionary mapping column names to BigQuery types.
+                If None, schema is auto-detected from the DataFrame.
+                Example: {"name": "STRING", "age": "INTEGER"}
+            write_disposition: How to handle existing data:
+                - "WRITE_TRUNCATE": Overwrite existing data (default)
+                - "WRITE_APPEND": Append to existing data
+                - "WRITE_EMPTY": Only write if table is empty
+
+        Raises:
+            ValueError: If write_disposition is "WRITE_EMPTY" and table is not empty.
+
+        Example:
+            >>> df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [30, 25]})
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> table.write(df)  # Overwrites existing data
+            >>> table.write(df, write_disposition="WRITE_APPEND")  # Appends
+        """
+        from google.cloud import bigquery
+        from .schema import dict_to_schema_fields, dataframe_to_schema_fields
+
+        # Determine schema
+        if schema is not None:
+            schema_fields = dict_to_schema_fields(schema)
+        else:
+            schema_fields = dataframe_to_schema_fields(data)
+
+        # Configure load job
+        job_config = bigquery.LoadJobConfig(
+            schema=schema_fields,
+            write_disposition=write_disposition,
+        )
+
+        # Load data
+        load_job = self._client.load_table_from_dataframe(
+            data, self.id, job_config=job_config
+        )
+
+        # Wait for job to complete
+        load_job.result()

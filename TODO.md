@@ -33,15 +33,15 @@
 - [x] Type hints and docstrings
 - [x] Tests for table reading
 
-## Slice 4: DataFrame → Table (Simple)
+## Slice 4: DataFrame → Table (Simple) ✓
 **Goal:** Write DataFrames to tables
-- [ ] Add schema auto-detection for DataFrames
-- [ ] Add DataFrame → BigQuery type conversion
-- [ ] Implement dict → SchemaField conversion ({"name": "STRING"})
-- [ ] Add `Table.write(df)` with WRITE_TRUNCATE default
-- [ ] Add `Client.load_data(table_id, df)` convenience method
-- [ ] Handle write dispositions (TRUNCATE, APPEND, EMPTY)
-- [ ] Tests for DataFrame writing
+- [x] Add schema auto-detection for DataFrames
+- [x] Add DataFrame → BigQuery type conversion
+- [x] Implement dict → SchemaField conversion ({"name": "STRING"})
+- [x] Add `Table.write(df)` with WRITE_TRUNCATE default
+- [x] Add `Client.load_data(table_id, df)` convenience method
+- [x] Handle write dispositions (TRUNCATE, APPEND, EMPTY)
+- [x] Tests for DataFrame writing
 
 ## Slice 5: Table Creation & Management
 **Goal:** Create/delete tables and datasets explicitly

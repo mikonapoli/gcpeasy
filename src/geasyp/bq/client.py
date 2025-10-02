@@ -138,6 +138,44 @@ class Client:
         """
         return self.dataset(dataset_id).tables()
 
+    def load_data(
+        self,
+        table_id: str,
+        data: pd.DataFrame,
+        schema: Optional[dict[str, str]] = None,
+        write_disposition: str = "WRITE_TRUNCATE",
+    ) -> None:
+        """Load data from a DataFrame to a table (convenience method).
+
+        Args:
+            table_id: Fully qualified table ID or "dataset.table" format.
+                If not fully qualified, uses the client's project.
+            data: DataFrame to load.
+            schema: Optional schema dictionary. If None, auto-detected from DataFrame.
+            write_disposition: How to handle existing data:
+                - "WRITE_TRUNCATE": Overwrite existing data (default)
+                - "WRITE_APPEND": Append to existing data
+                - "WRITE_EMPTY": Only write if table is empty
+
+        Example:
+            >>> df = pd.DataFrame({"name": ["Alice"], "age": [30]})
+            >>> client.load_data("my_dataset.my_table", df)
+        """
+        # Parse table_id
+        parts = table_id.split(".")
+        if len(parts) == 2:
+            dataset_id, table_name = parts
+        elif len(parts) == 3:
+            _, dataset_id, table_name = parts
+        else:
+            raise ValueError(
+                f"Invalid table_id format: {table_id}. "
+                "Expected 'dataset.table' or 'project.dataset.table'"
+            )
+
+        table = self.dataset(dataset_id).table(table_name)
+        table.write(data, schema=schema, write_disposition=write_disposition)  # type: ignore
+
 
 def init(
     project_id: Optional[str] = None,
