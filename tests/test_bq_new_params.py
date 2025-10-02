@@ -4,15 +4,15 @@ import pytest
 from unittest.mock import Mock, patch
 from google.cloud import bigquery
 
-from geasyp.bq import Client, init
-from geasyp.bq.dataset import Dataset
-from geasyp.bq.table import Table
+from gcpeasy.bq import Client, init
+from gcpeasy.bq.dataset import Dataset
+from gcpeasy.bq.table import Table
 
 
 class TestMaxResultsParameter:
     """Tests for max_results parameter on list methods."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_datasets_with_max_results_should_pass_to_gcp(self, mock_bq_client):
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
@@ -23,7 +23,7 @@ class TestMaxResultsParameter:
 
         mock_bq_client.return_value.list_datasets.assert_called_once_with(max_results=5)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_datasets_without_max_results_should_pass_none(self, mock_bq_client):
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
@@ -34,7 +34,7 @@ class TestMaxResultsParameter:
 
         mock_bq_client.return_value.list_datasets.assert_called_once_with(max_results=None)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_client_tables_with_max_results_should_pass_to_dataset(self, mock_bq_client):
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
@@ -47,7 +47,7 @@ class TestMaxResultsParameter:
             "test-project.my_dataset", max_results=10
         )
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_tables_with_max_results_should_pass_to_gcp(self, mock_bq_client):
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.list_tables.return_value = []
@@ -63,7 +63,7 @@ class TestMaxResultsParameter:
 class TestToDataframeParameter:
     """Tests for to_dataframe parameter on query methods."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_query_with_to_dataframe_true_should_return_dataframe(self, mock_bq_client):
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
@@ -79,7 +79,7 @@ class TestToDataframeParameter:
         assert result == mock_df
         mock_job.to_dataframe.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_query_with_to_dataframe_false_should_return_iterator(self, mock_bq_client):
         mock_bq_client.return_value.project = "test-project"
         mock_bq_client.return_value.location = "EU"
@@ -95,7 +95,7 @@ class TestToDataframeParameter:
         assert result == mock_iterator
         mock_job.result.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_query_default_should_return_dataframe(self, mock_bq_client):
         """Test that default behavior returns DataFrame."""
         mock_bq_client.return_value.project = "test-project"
@@ -112,7 +112,7 @@ class TestToDataframeParameter:
         assert result == mock_df
         mock_job.to_dataframe.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_call_with_to_dataframe_false_should_return_iterator(self, mock_bq_client):
         """Test __call__ method with to_dataframe=False."""
         mock_bq_client.return_value.project = "test-project"
@@ -129,7 +129,7 @@ class TestToDataframeParameter:
         assert result == mock_iterator
         mock_job.result.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_call_default_should_return_dataframe(self, mock_bq_client):
         """Test __call__ method default behavior."""
         mock_bq_client.return_value.project = "test-project"

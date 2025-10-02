@@ -6,11 +6,11 @@ from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch, mock_open
 from google.cloud import bigquery
 
-from geasyp.bq.file_utils import (
+from gcpeasy.bq.file_utils import (
     detect_source_format,
     create_load_job_config,
 )
-from geasyp.bq.table import Table
+from gcpeasy.bq.table import Table
 
 
 class TestDetectSourceFormat:
@@ -219,9 +219,9 @@ class TestClientLoadData:
     """Tests for Client.load_data() with file inputs."""
 
     def test_loading_csv_file_should_delegate_to_table_write(self):
-        from geasyp.bq.client import Client
+        from gcpeasy.bq.client import Client
 
-        with patch("geasyp.bq.client.bigquery.Client") as mock_bq_client:
+        with patch("gcpeasy.bq.client.bigquery.Client") as mock_bq_client:
             mock_instance = Mock()
             mock_bq_client.return_value = mock_instance
             mock_instance.project = "test_project"
@@ -237,9 +237,9 @@ class TestClientLoadData:
                 assert call_args[0][0] == "test.csv"
 
     def test_loading_file_with_schema_should_pass_schema(self):
-        from geasyp.bq.client import Client
+        from gcpeasy.bq.client import Client
 
-        with patch("geasyp.bq.client.bigquery.Client") as mock_bq_client:
+        with patch("gcpeasy.bq.client.bigquery.Client") as mock_bq_client:
             mock_instance = Mock()
             mock_bq_client.return_value = mock_instance
             mock_instance.project = "test_project"
@@ -254,9 +254,9 @@ class TestClientLoadData:
                 assert mock_write.call_args[1]["schema"] == schema
 
     def test_loading_none_with_schema_should_create_table(self):
-        from geasyp.bq.client import Client
+        from gcpeasy.bq.client import Client
 
-        with patch("geasyp.bq.client.bigquery.Client") as mock_bq_client:
+        with patch("gcpeasy.bq.client.bigquery.Client") as mock_bq_client:
             mock_instance = Mock()
             mock_bq_client.return_value = mock_instance
             mock_instance.project = "test_project"

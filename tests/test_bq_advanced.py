@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch, mock_open
 from google.cloud import bigquery
 
-from geasyp.bq.table import Table
+from gcpeasy.bq.table import Table
 
 
 class TestTableInsert:

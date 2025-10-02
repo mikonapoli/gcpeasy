@@ -2,7 +2,7 @@
 
 ## Slice 1: Basic Query Execution ✓
 **Goal:** Run SQL queries and get DataFrames back
-- [x] Create `geasyp/bq.py` module structure
+- [x] Create `gcpeasy/bq.py` module structure
 - [x] Implement `init()` function returning Client
 - [x] Implement `Client` class with `_gcp` attribute
 - [x] Add `Client.__call__()` for query execution → DataFrame

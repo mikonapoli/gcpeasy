@@ -1,4 +1,4 @@
-"""BigQuery client for geasyp."""
+"""BigQuery client for gcpeasy."""
 
 from typing import Any, Optional, Union
 from pathlib import Path
@@ -248,7 +248,7 @@ def init(
         Initialized BigQuery Client.
 
     Example:
-        >>> from geasyp import bq
+        >>> from gcpeasy import bq
         >>> client = bq.init()
         >>> df = client("SELECT 1 as value")
     """

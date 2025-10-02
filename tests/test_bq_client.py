@@ -6,13 +6,13 @@ import pandas as pd
 from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig
 
-from geasyp.bq import Client, init
+from gcpeasy.bq import Client, init
 
 
 class TestInit:
     """Tests for the init() function."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_should_return_client_instance(self, mock_bq_client):
         """Test that init() returns a Client instance."""
         mock_bq_client.return_value.project = "test-project"
@@ -22,7 +22,7 @@ class TestInit:
 
         assert isinstance(client, Client)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_should_set_project_id_from_gcp_client(self, mock_bq_client):
         """Test that init() sets project_id from GCP client."""
         mock_bq_client.return_value.project = "test-project"
@@ -32,7 +32,7 @@ class TestInit:
 
         assert client.project_id == "test-project"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_should_set_location_from_gcp_client(self, mock_bq_client):
         """Test that init() sets location from GCP client."""
         mock_bq_client.return_value.project = "test-project"
@@ -42,7 +42,7 @@ class TestInit:
 
         assert client.location == "EU"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_with_project_id_should_pass_project_to_bigquery_client(self, mock_bq_client):
         """Test that init() with project_id passes it to BigQuery client."""
         mock_bq_client.return_value.project = "custom-project"
@@ -52,7 +52,7 @@ class TestInit:
 
         mock_bq_client.assert_called_once_with(project="custom-project", location="EU")
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_with_project_id_should_store_project_id_on_client(self, mock_bq_client):
         """Test that init() with project_id stores it on client."""
         mock_bq_client.return_value.project = "custom-project"
@@ -62,7 +62,7 @@ class TestInit:
 
         assert client.project_id == "custom-project"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_with_location_should_pass_location_to_bigquery_client(self, mock_bq_client):
         """Test that init() with location passes it to BigQuery client."""
         mock_bq_client.return_value.project = "test-project"
@@ -72,7 +72,7 @@ class TestInit:
 
         mock_bq_client.assert_called_once_with(project=None, location="US")
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_init_with_location_should_store_location_on_client(self, mock_bq_client):
         """Test that init() with location stores it on client."""
         mock_bq_client.return_value.project = "test-project"
@@ -86,7 +86,7 @@ class TestInit:
 class TestClientQuery:
     """Tests for Client query methods."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_calling_client_should_execute_query_on_gcp_client(self, mock_bq_client):
         """Test that calling client executes query on GCP client."""
         mock_job = Mock()
@@ -101,7 +101,7 @@ class TestClientQuery:
 
         mock_bq_client.return_value.query.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_calling_client_should_return_query_result_as_dataframe(self, mock_bq_client):
         """Test that calling client returns query result as DataFrame."""
         mock_job = Mock()
@@ -116,7 +116,7 @@ class TestClientQuery:
 
         pd.testing.assert_frame_equal(result, mock_df)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_query_should_execute_query_on_gcp_client(self, mock_bq_client):
         """Test that query() executes query on GCP client."""
         mock_job = Mock()
@@ -131,7 +131,7 @@ class TestClientQuery:
 
         mock_bq_client.return_value.query.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_query_should_return_query_result_as_dataframe(self, mock_bq_client):
         """Test that query() returns query result as DataFrame."""
         mock_job = Mock()
@@ -146,8 +146,8 @@ class TestClientQuery:
 
         pd.testing.assert_frame_equal(result, mock_df)
 
-    @patch("geasyp.bq.client.bigquery.Client")
-    @patch("geasyp.bq.client.bigquery.ScalarQueryParameter")
+    @patch("gcpeasy.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.ScalarQueryParameter")
     def test_query_with_params_should_create_scalar_query_parameters(self, mock_param_class, mock_bq_client):
         """Test that query() with params creates ScalarQueryParameter."""
         mock_job = Mock()
@@ -168,8 +168,8 @@ class TestClientQuery:
 
         mock_param_class.assert_called_once_with("id", "INT64", 123)
 
-    @patch("geasyp.bq.client.bigquery.Client")
-    @patch("geasyp.bq.client.bigquery.ScalarQueryParameter")
+    @patch("gcpeasy.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.ScalarQueryParameter")
     def test_query_with_params_should_return_query_result_as_dataframe(self, mock_param_class, mock_bq_client):
         """Test that query() with params returns query result as DataFrame."""
         mock_job = Mock()
@@ -190,7 +190,7 @@ class TestClientQuery:
 
         pd.testing.assert_frame_equal(result, mock_df)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_query_with_custom_job_config(self, mock_bq_client):
         """Test query() with custom job config."""
         mock_job = Mock()
@@ -213,7 +213,7 @@ class TestClientQuery:
 class TestClientProperties:
     """Tests for Client properties."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_client_has_gcp_attribute(self, mock_bq_client):
         """Test that Client exposes _gcp attribute."""
         mock_instance = Mock()
@@ -225,7 +225,7 @@ class TestClientProperties:
 
         assert client._gcp == mock_instance
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_client_stores_project_id(self, mock_bq_client):
         """Test that Client stores project_id."""
         mock_bq_client.return_value.project = "my-project"

@@ -1,4 +1,4 @@
-"""BigQuery utilities for geasyp."""
+"""BigQuery utilities for gcpeasy."""
 
 from .client import Client, init
 

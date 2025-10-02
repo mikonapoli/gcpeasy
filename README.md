@@ -1,3 +1,3 @@
-# gEASYp
+# gcpeasy
 
-> GCP, but easy
+> GCP, but easy peasy

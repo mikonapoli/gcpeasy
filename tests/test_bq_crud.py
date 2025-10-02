@@ -5,13 +5,13 @@ from unittest.mock import Mock, patch
 from google.api_core import exceptions
 from google.cloud import bigquery
 
-from geasyp.bq import init
+from gcpeasy.bq import init
 
 
 class TestDatasetCreate:
     """Tests for Dataset.create() method."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_should_call_gcp_create_dataset(self, mock_bq_client):
         """Test that create() calls GCP client's create_dataset."""
         mock_bq_client.return_value.project = "test-project"
@@ -24,7 +24,7 @@ class TestDatasetCreate:
 
         mock_bq_client.return_value.create_dataset.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_should_use_correct_dataset_id(self, mock_bq_client):
         """Test that create() uses correct dataset_id."""
         mock_bq_client.return_value.project = "test-project"
@@ -39,7 +39,7 @@ class TestDatasetCreate:
         dataset_obj = call_args[0][0]
         assert dataset_obj.dataset_id == "my_dataset"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_should_use_client_project(self, mock_bq_client):
         """Test that create() uses client's project."""
         mock_bq_client.return_value.project = "test-project"
@@ -54,7 +54,7 @@ class TestDatasetCreate:
         dataset_obj = call_args[0][0]
         assert dataset_obj.project == "test-project"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_should_return_self_for_chaining(self, mock_bq_client):
         """Test that create() returns self to allow method chaining."""
         mock_bq_client.return_value.project = "test-project"
@@ -67,7 +67,7 @@ class TestDatasetCreate:
 
         assert result is dataset
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_with_location_should_set_location(self, mock_bq_client):
         """Test that create() with location parameter sets location."""
         mock_bq_client.return_value.project = "test-project"
@@ -82,7 +82,7 @@ class TestDatasetCreate:
         dataset_obj = call_args[0][0]
         assert dataset_obj.location == "US"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_with_description_should_set_description(self, mock_bq_client):
         """Test that create() with description sets description."""
         mock_bq_client.return_value.project = "test-project"
@@ -97,7 +97,7 @@ class TestDatasetCreate:
         dataset_obj = call_args[0][0]
         assert dataset_obj.description == "Test dataset"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_with_expiration_should_set_table_expiration(self, mock_bq_client):
         """Test that create() with expiration sets default table expiration."""
         mock_bq_client.return_value.project = "test-project"
@@ -112,7 +112,7 @@ class TestDatasetCreate:
         dataset_obj = call_args[0][0]
         assert dataset_obj.default_table_expiration_ms == 86400000
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_exists_ok_true(self, mock_bq_client):
         """Test dataset creation with exists_ok=True doesn't raise on conflict."""
         mock_bq_client.return_value.project = "test-project"
@@ -127,7 +127,7 @@ class TestDatasetCreate:
         # Should not raise
         dataset.create(exists_ok=True)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_create_exists_ok_false(self, mock_bq_client):
         """Test dataset creation with exists_ok=False raises on conflict."""
         mock_bq_client.return_value.project = "test-project"
@@ -146,7 +146,7 @@ class TestDatasetCreate:
 class TestDatasetDelete:
     """Tests for Dataset.delete() method."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_delete_should_call_gcp_with_default_parameters(self, mock_bq_client):
         """Test basic dataset deletion with default parameters."""
         mock_bq_client.return_value.project = "test-project"
@@ -161,7 +161,7 @@ class TestDatasetDelete:
             "test-project.my_dataset", delete_contents=False, not_found_ok=False
         )
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_delete_with_contents(self, mock_bq_client):
         """Test dataset deletion with delete_contents=True."""
         mock_bq_client.return_value.project = "test-project"
@@ -176,7 +176,7 @@ class TestDatasetDelete:
             "test-project.my_dataset", delete_contents=True, not_found_ok=False
         )
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_delete_not_found_ok_true(self, mock_bq_client):
         """Test dataset deletion with not_found_ok=True doesn't raise."""
         mock_bq_client.return_value.project = "test-project"
@@ -191,7 +191,7 @@ class TestDatasetDelete:
         # Should not raise
         dataset.delete(not_found_ok=True)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_dataset_delete_not_found_ok_false(self, mock_bq_client):
         """Test dataset deletion with not_found_ok=False raises."""
         mock_bq_client.return_value.project = "test-project"
@@ -210,7 +210,7 @@ class TestDatasetDelete:
 class TestTableCreate:
     """Tests for Table.create() method."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_should_call_gcp_create_table(self, mock_bq_client):
         """Test that create() calls GCP client's create_table."""
         mock_bq_client.return_value.project = "test-project"
@@ -224,7 +224,7 @@ class TestTableCreate:
 
         mock_bq_client.return_value.create_table.assert_called_once()
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_should_set_correct_table_id(self, mock_bq_client):
         """Test that create() sets correct table_id."""
         mock_bq_client.return_value.project = "test-project"
@@ -240,7 +240,7 @@ class TestTableCreate:
         table_obj = call_args[0][0]
         assert table_obj.table_id == "my_table"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_should_set_correct_dataset_id(self, mock_bq_client):
         """Test that create() sets correct dataset_id."""
         mock_bq_client.return_value.project = "test-project"
@@ -256,7 +256,7 @@ class TestTableCreate:
         table_obj = call_args[0][0]
         assert table_obj.dataset_id == "my_dataset"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_should_use_client_project(self, mock_bq_client):
         """Test that create() sets correct project."""
         mock_bq_client.return_value.project = "test-project"
@@ -272,7 +272,7 @@ class TestTableCreate:
         table_obj = call_args[0][0]
         assert table_obj.project == "test-project"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_should_convert_schema_dict_to_fields(self, mock_bq_client):
         """Test that create() converts schema dict to SchemaField objects."""
         mock_bq_client.return_value.project = "test-project"
@@ -288,7 +288,7 @@ class TestTableCreate:
         table_obj = call_args[0][0]
         assert len(table_obj.schema) == 2
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_should_return_self_for_chaining(self, mock_bq_client):
         """Test that create() returns self to allow method chaining."""
         mock_bq_client.return_value.project = "test-project"
@@ -302,7 +302,7 @@ class TestTableCreate:
 
         assert result is table
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_with_partitioning(self, mock_bq_client):
         """Test table creation with partitioning."""
         mock_bq_client.return_value.project = "test-project"
@@ -320,7 +320,7 @@ class TestTableCreate:
         assert table_obj.time_partitioning is not None
         assert table_obj.time_partitioning.field == "created"
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_with_clustering(self, mock_bq_client):
         """Test table creation with clustering."""
         mock_bq_client.return_value.project = "test-project"
@@ -337,7 +337,7 @@ class TestTableCreate:
 
         assert table_obj.clustering_fields == ["city", "age"]
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_exists_ok_true(self, mock_bq_client):
         """Test table creation with exists_ok=True doesn't raise on conflict."""
         mock_bq_client.return_value.project = "test-project"
@@ -353,7 +353,7 @@ class TestTableCreate:
         # Should not raise
         table.create(schema, exists_ok=True)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_create_exists_ok_false(self, mock_bq_client):
         """Test table creation with exists_ok=False raises on conflict."""
         mock_bq_client.return_value.project = "test-project"
@@ -373,7 +373,7 @@ class TestTableCreate:
 class TestTableDelete:
     """Tests for Table.delete() method."""
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_delete_basic(self, mock_bq_client):
         """Test basic table deletion."""
         mock_bq_client.return_value.project = "test-project"
@@ -388,7 +388,7 @@ class TestTableDelete:
             "test-project.my_dataset.my_table", not_found_ok=False
         )
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_delete_not_found_ok_true(self, mock_bq_client):
         """Test table deletion with not_found_ok=True doesn't raise."""
         mock_bq_client.return_value.project = "test-project"
@@ -403,7 +403,7 @@ class TestTableDelete:
         # Should not raise
         table.delete(not_found_ok=True)
 
-    @patch("geasyp.bq.client.bigquery.Client")
+    @patch("gcpeasy.bq.client.bigquery.Client")
     def test_table_delete_not_found_ok_false(self, mock_bq_client):
         """Test table deletion with not_found_ok=False raises."""
         mock_bq_client.return_value.project = "test-project"

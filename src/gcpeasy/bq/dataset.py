@@ -1,4 +1,4 @@
-"""BigQuery Dataset class for geasyp."""
+"""BigQuery Dataset class for gcpeasy."""
 
 from typing import TYPE_CHECKING, Optional
 

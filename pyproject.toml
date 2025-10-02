@@ -1,7 +1,7 @@
 [project]
-name = "geasyp"
+name = "gcpeasy"
 version = "0.1.0"
-description = "GCP, but easy"
+description = "GCP, but easy peasy"
 readme = "README.md"
 authors = [
     { name = "mikonapoli", email = "michelangelo.bucci@gmail.com" }

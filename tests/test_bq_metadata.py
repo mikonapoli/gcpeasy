@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from google.cloud import bigquery
 
-from geasyp.bq.dataset import Dataset
-from geasyp.bq.table import Table
+from gcpeasy.bq.dataset import Dataset
+from gcpeasy.bq.table import Table
 
 
 class TestDatasetMetadata:

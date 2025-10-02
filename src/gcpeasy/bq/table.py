@@ -1,4 +1,4 @@
-"""BigQuery Table class for geasyp."""
+"""BigQuery Table class for gcpeasy."""
 
 from typing import TYPE_CHECKING, Optional, Literal, Union
 from pathlib import Path
