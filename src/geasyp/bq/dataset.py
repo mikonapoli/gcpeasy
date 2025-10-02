@@ -1,6 +1,6 @@
 """BigQuery Dataset class for geasyp."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from google.cloud import bigquery
@@ -68,3 +68,73 @@ class Dataset:
         from .table import Table
 
         return Table(self._client, table_id, self._dataset_id, self._project_id)
+
+    def create(
+        self,
+        location: Optional[str] = None,
+        description: Optional[str] = None,
+        default_table_expiration_ms: Optional[int] = None,
+        exists_ok: bool = False,
+    ) -> "Dataset":
+        """Create the dataset.
+
+        Args:
+            location: Geographic location for the dataset. If None, uses client's location.
+            description: Optional description for the dataset.
+            default_table_expiration_ms: Default expiration time for tables in milliseconds.
+            exists_ok: If True, don't raise error if dataset already exists.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            google.api_core.exceptions.Conflict: If dataset exists and exists_ok is False.
+
+        Example:
+            >>> dataset = client.dataset("my_dataset")
+            >>> dataset.create(description="My dataset", exists_ok=True)
+        """
+        from google.cloud import bigquery
+        from google.api_core import exceptions
+
+        # Create dataset object
+        dataset_ref = bigquery.Dataset(self.id)
+        if location:
+            dataset_ref.location = location
+        if description:
+            dataset_ref.description = description
+        if default_table_expiration_ms:
+            dataset_ref.default_table_expiration_ms = default_table_expiration_ms
+
+        # Create dataset
+        try:
+            self._client.create_dataset(dataset_ref)
+        except exceptions.Conflict:
+            if not exists_ok:
+                raise
+
+        return self
+
+    def delete(self, delete_contents: bool = False, not_found_ok: bool = False) -> None:
+        """Delete the dataset.
+
+        Args:
+            delete_contents: If True, delete all tables in the dataset before deleting.
+            not_found_ok: If True, don't raise error if dataset doesn't exist.
+
+        Raises:
+            google.api_core.exceptions.NotFound: If dataset doesn't exist and not_found_ok is False.
+
+        Example:
+            >>> dataset = client.dataset("my_dataset")
+            >>> dataset.delete(delete_contents=True)
+        """
+        from google.api_core import exceptions
+
+        try:
+            self._client.delete_dataset(
+                self.id, delete_contents=delete_contents, not_found_ok=False
+            )
+        except exceptions.NotFound:
+            if not not_found_ok:
+                raise

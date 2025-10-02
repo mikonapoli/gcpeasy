@@ -133,3 +133,78 @@ class Table:
 
         # Wait for job to complete
         load_job.result()
+
+    def create(
+        self,
+        schema: dict[str, str],
+        partitioning_field: Optional[str] = None,
+        clustering_fields: Optional[list[str]] = None,
+        exists_ok: bool = False,
+    ) -> "Table":
+        """Create the table.
+
+        Args:
+            schema: Schema dictionary mapping column names to BigQuery types.
+                Example: {"name": "STRING", "age": "INTEGER", "created": "TIMESTAMP"}
+            partitioning_field: Optional field name to partition by (must be DATE, TIMESTAMP, or DATETIME).
+            clustering_fields: Optional list of field names to cluster by (max 4).
+            exists_ok: If True, don't raise error if table already exists.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            google.api_core.exceptions.Conflict: If table exists and exists_ok is False.
+
+        Example:
+            >>> schema = {"name": "STRING", "age": "INT64"}
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> table.create(schema, exists_ok=True)
+        """
+        from google.cloud import bigquery
+        from google.api_core import exceptions
+        from .schema import dict_to_schema_fields
+
+        # Create table reference
+        table_ref = bigquery.Table(self.id)
+        table_ref.schema = dict_to_schema_fields(schema)
+
+        # Set partitioning
+        if partitioning_field:
+            table_ref.time_partitioning = bigquery.TimePartitioning(
+                field=partitioning_field
+            )
+
+        # Set clustering
+        if clustering_fields:
+            table_ref.clustering_fields = clustering_fields
+
+        # Create table
+        try:
+            self._client.create_table(table_ref)
+        except exceptions.Conflict:
+            if not exists_ok:
+                raise
+
+        return self
+
+    def delete(self, not_found_ok: bool = False) -> None:
+        """Delete the table.
+
+        Args:
+            not_found_ok: If True, don't raise error if table doesn't exist.
+
+        Raises:
+            google.api_core.exceptions.NotFound: If table doesn't exist and not_found_ok is False.
+
+        Example:
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> table.delete()
+        """
+        from google.api_core import exceptions
+
+        try:
+            self._client.delete_table(self.id, not_found_ok=False)
+        except exceptions.NotFound:
+            if not not_found_ok:
+                raise

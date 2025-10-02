@@ -43,15 +43,15 @@
 - [x] Handle write dispositions (TRUNCATE, APPEND, EMPTY)
 - [x] Tests for DataFrame writing
 
-## Slice 5: Table Creation & Management
+## Slice 5: Table Creation & Management ✓
 **Goal:** Create/delete tables and datasets explicitly
-- [ ] Add `Dataset.create()` with location, description, expiration
-- [ ] Add `Dataset.delete()` with delete_contents option
-- [ ] Add `Table.create()` with schema dict, partitioning, clustering
-- [ ] Add `Table.delete()` method
-- [ ] Handle exists_ok/not_found_ok flags
-- [ ] Validate table_id formats (dataset.table vs project.dataset.table)
-- [ ] Tests for CRUD operations
+- [x] Add `Dataset.create()` with location, description, expiration
+- [x] Add `Dataset.delete()` with delete_contents option
+- [x] Add `Table.create()` with schema dict, partitioning, clustering
+- [x] Add `Table.delete()` method
+- [x] Handle exists_ok/not_found_ok flags
+- [x] Validate table_id formats (dataset.table vs project.dataset.table)
+- [x] Tests for CRUD operations
 
 ## Slice 6: File Loading
 **Goal:** Load data from files (CSV, JSON, Parquet, etc.)
