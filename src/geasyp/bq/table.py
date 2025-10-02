@@ -263,6 +263,7 @@ class Table:
         schema: dict[str, str],
         partitioning_field: Optional[str] = None,
         clustering_fields: Optional[list[str]] = None,
+        description: Optional[str] = None,
         exists_ok: bool = False,
     ) -> "Table":
         """Create the table.
@@ -272,6 +273,7 @@ class Table:
                 Example: {"name": "STRING", "age": "INTEGER", "created": "TIMESTAMP"}
             partitioning_field: Optional field name to partition by (must be DATE, TIMESTAMP, or DATETIME).
             clustering_fields: Optional list of field names to cluster by (max 4).
+            description: Optional table description.
             exists_ok: If True, don't raise error if table already exists.
 
         Returns:
@@ -283,7 +285,7 @@ class Table:
         Example:
             >>> schema = {"name": "STRING", "age": "INT64"}
             >>> table = client.dataset("my_dataset").table("my_table")
-            >>> table.create(schema, exists_ok=True)
+            >>> table.create(schema, description="User data", exists_ok=True)
         """
         from google.cloud import bigquery
         from google.api_core import exceptions
@@ -292,6 +294,10 @@ class Table:
         # Create table reference
         table_ref = bigquery.Table(self.id)
         table_ref.schema = dict_to_schema_fields(schema)
+
+        # Set description
+        if description:
+            table_ref.description = description
 
         # Set partitioning
         if partitioning_field:

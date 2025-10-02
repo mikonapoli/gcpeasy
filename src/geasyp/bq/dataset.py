@@ -47,13 +47,22 @@ class Dataset:
         except exceptions.NotFound:
             return False
 
-    def tables(self) -> list[str]:
+    def tables(self, max_results: Optional[int] = None) -> list[str]:
         """List all tables in the dataset.
+
+        Args:
+            max_results: Maximum number of tables to return. If None, returns all tables.
 
         Returns:
             List of table IDs (without project or dataset prefix).
+
+        Example:
+            >>> dataset = client.dataset("my_dataset")
+            >>> tables = dataset.tables()
+            >>> # Limit results
+            >>> tables = dataset.tables(max_results=10)
         """
-        tables = self._client.list_tables(self.id)
+        tables = self._client.list_tables(self.id, max_results=max_results)
         return [table.table_id for table in tables]
 
     def table(self, table_id: str) -> "Table":

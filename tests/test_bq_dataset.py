@@ -119,7 +119,7 @@ class TestClientDatasets:
         client.tables("my_dataset")
 
         mock_bq_client.return_value.list_tables.assert_called_once_with(
-            "test-project.my_dataset"
+            "test-project.my_dataset", max_results=None
         )
 
 
@@ -216,7 +216,7 @@ class TestDataset:
         dataset.tables()
 
         mock_bq_client.return_value.list_tables.assert_called_once_with(
-            "test-project.my_dataset"
+            "test-project.my_dataset", max_results=None
         )
 
     @patch("geasyp.bq.client.bigquery.Client")
