@@ -63,14 +63,14 @@
 - [x] Handle schema=None case for table creation
 - [x] Tests for file loading
 
-## Slice 7: Metadata & Inspection
+## Slice 7: Metadata & Inspection ✓
 **Goal:** Inspect and update table/dataset metadata
-- [ ] Add `Dataset.get_metadata()` method
-- [ ] Add `Table.get_metadata()` method
-- [ ] Add `Table.get_schema()` method
-- [ ] Add `Dataset.update()` for description, labels, expiration
-- [ ] Add `Table.update()` for schema, description, labels
-- [ ] Tests for metadata operations
+- [x] Add `Dataset.get_metadata()` method
+- [x] Add `Table.get_metadata()` method
+- [x] Add `Table.get_schema()` method
+- [x] Add `Dataset.update()` for description, labels, expiration
+- [x] Add `Table.update()` for schema, description, labels
+- [x] Tests for metadata operations
 
 ## Slice 8: Advanced Operations
 **Goal:** Streaming inserts, exports, and table copying

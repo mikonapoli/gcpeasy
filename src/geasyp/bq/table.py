@@ -279,3 +279,89 @@ class Table:
         except exceptions.NotFound:
             if not not_found_ok:
                 raise
+
+    def get_metadata(self) -> "bigquery.Table":
+        """Get table metadata and properties.
+
+        Returns:
+            BigQuery Table object with full metadata including schema,
+            partitioning, clustering, creation time, etc.
+
+        Example:
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> metadata = table.get_metadata()
+            >>> print(metadata.num_rows)
+            >>> print(metadata.created)
+        """
+        return self._client.get_table(self.id)
+
+    def get_schema(self) -> list["bigquery.SchemaField"]:
+        """Get table schema.
+
+        Returns:
+            List of SchemaField objects representing the table schema.
+
+        Example:
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> schema = table.get_schema()
+            >>> for field in schema:
+            ...     print(f"{field.name}: {field.field_type}")
+        """
+        table_ref = self._client.get_table(self.id)
+        return table_ref.schema
+
+    def update(
+        self,
+        schema: Optional[dict[str, str]] = None,
+        description: Optional[str] = None,
+        labels: Optional[dict[str, str]] = None,
+    ) -> "Table":
+        """Update table properties.
+
+        Args:
+            schema: Dict where keys are field names and values are type strings.
+                Can only add fields, not remove them.
+                Example: {"new_field": "STRING"}
+            description: New description for the table.
+            labels: Labels dict to set on the table.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> table = client.dataset("my_dataset").table("my_table")
+            >>> table.update(
+            ...     description="Updated table description",
+            ...     labels={"env": "prod"}
+            ... )
+        """
+        from google.cloud import bigquery
+        from .schema import dict_to_schema_fields
+
+        # Get current table
+        table_ref = self._client.get_table(self.id)
+
+        # Update fields
+        if schema is not None:
+            # Add new fields to existing schema
+            new_fields = dict_to_schema_fields(schema)
+            table_ref.schema = list(table_ref.schema) + new_fields
+        if description is not None:
+            table_ref.description = description
+        if labels is not None:
+            table_ref.labels = labels
+
+        # Determine which fields to update
+        fields_to_update = []
+        if schema is not None:
+            fields_to_update.append("schema")
+        if description is not None:
+            fields_to_update.append("description")
+        if labels is not None:
+            fields_to_update.append("labels")
+
+        # Update table
+        if fields_to_update:
+            self._client.update_table(table_ref, fields_to_update)
+
+        return self

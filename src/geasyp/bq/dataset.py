@@ -138,3 +138,69 @@ class Dataset:
         except exceptions.NotFound:
             if not not_found_ok:
                 raise
+
+    def get_metadata(self) -> "bigquery.Dataset":
+        """Get dataset metadata and properties.
+
+        Returns:
+            BigQuery Dataset object with full metadata including location,
+            description, labels, creation time, etc.
+
+        Example:
+            >>> dataset = client.dataset("my_dataset")
+            >>> metadata = dataset.get_metadata()
+            >>> print(metadata.location)
+            >>> print(metadata.description)
+        """
+        return self._client.get_dataset(self.id)
+
+    def update(
+        self,
+        description: Optional[str] = None,
+        labels: Optional[dict[str, str]] = None,
+        default_table_expiration_ms: Optional[int] = None,
+    ) -> "Dataset":
+        """Update dataset properties.
+
+        Args:
+            description: New description for the dataset.
+            labels: Labels dict to set on the dataset.
+            default_table_expiration_ms: Default expiration time for tables in milliseconds.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> dataset = client.dataset("my_dataset")
+            >>> dataset.update(
+            ...     description="Updated description",
+            ...     labels={"env": "prod"}
+            ... )
+        """
+        from google.cloud import bigquery
+
+        # Get current dataset
+        dataset_ref = self._client.get_dataset(self.id)
+
+        # Update fields
+        if description is not None:
+            dataset_ref.description = description
+        if labels is not None:
+            dataset_ref.labels = labels
+        if default_table_expiration_ms is not None:
+            dataset_ref.default_table_expiration_ms = default_table_expiration_ms
+
+        # Determine which fields to update
+        fields_to_update = []
+        if description is not None:
+            fields_to_update.append("description")
+        if labels is not None:
+            fields_to_update.append("labels")
+        if default_table_expiration_ms is not None:
+            fields_to_update.append("default_table_expiration_ms")
+
+        # Update dataset
+        if fields_to_update:
+            self._client.update_dataset(dataset_ref, fields_to_update)
+
+        return self
