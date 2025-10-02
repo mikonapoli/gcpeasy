@@ -23,15 +23,15 @@
 - [x] Type hints and docstrings
 - [x] Tests for listing/navigation
 
-## Slice 3: Table Reading
+## Slice 3: Table Reading ✓
 **Goal:** Read table data into DataFrames
-- [ ] Implement `Table` class with `id` property (fully qualified)
-- [ ] Add `Dataset.table(name)` to get Table object
-- [ ] Add `Table.exists()` method
-- [ ] Add `Table.read()` returning DataFrame
-- [ ] Handle pagination properly
-- [ ] Type hints and docstrings
-- [ ] Tests for table reading
+- [x] Implement `Table` class with `id` property (fully qualified)
+- [x] Add `Dataset.table(name)` to get Table object
+- [x] Add `Table.exists()` method
+- [x] Add `Table.read()` returning DataFrame
+- [x] Handle pagination properly
+- [x] Type hints and docstrings
+- [x] Tests for table reading
 
 ## Slice 4: DataFrame → Table (Simple)
 **Goal:** Write DataFrames to tables
