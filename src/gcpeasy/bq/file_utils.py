@@ -9,16 +9,12 @@ def detect_source_format(file_path: Path) -> str:
     """Detect BigQuery source format from file extension.
 
     Args:
-        file_path: Path to the file.
+        file_path: Path to file.
 
     Returns:
-        BigQuery source format string (e.g., "CSV", "NEWLINE_DELIMITED_JSON").
-
-    Raises:
-        ValueError: If file extension is not supported.
+        BigQuery source format string.
     """
-    extension = file_path.suffix.lower()
-
+    ext = file_path.suffix.lower()
     format_map = {
         ".csv": "CSV",
         ".json": "NEWLINE_DELIMITED_JSON",
@@ -29,40 +25,13 @@ def detect_source_format(file_path: Path) -> str:
         ".orc": "ORC",
     }
 
-    if extension not in format_map:
+    if ext not in format_map:
         raise ValueError(
-            f"Unsupported file format: {extension}. "
+            f"Unsupported file format: {ext}. "
             f"Supported formats: {', '.join(format_map.keys())}"
         )
 
-    return format_map[extension]
-
-
-def auto_detect_schema_from_file(
-    client: bigquery.Client, file_path: Path, source_format: str
-) -> list[bigquery.SchemaField]:
-    """Auto-detect schema from a file.
-
-    Args:
-        client: BigQuery client.
-        file_path: Path to the file.
-        source_format: BigQuery source format (e.g., "CSV", "PARQUET").
-
-    Returns:
-        List of SchemaField objects representing the detected schema.
-
-    Raises:
-        ValueError: If auto-detection is not supported for the format.
-    """
-    # Auto-detection is supported for CSV, JSON, and Parquet
-    if source_format not in ["CSV", "NEWLINE_DELIMITED_JSON", "PARQUET"]:
-        raise ValueError(
-            f"Schema auto-detection not supported for format: {source_format}"
-        )
-
-    # For now, we'll return None to let BigQuery handle auto-detection
-    # This will be used in the job config with autodetect=True
-    return []
+    return format_map[ext]
 
 
 def create_load_job_config(
@@ -76,10 +45,10 @@ def create_load_job_config(
     """Create a LoadJobConfig for file loading.
 
     Args:
-        source_format: BigQuery source format (e.g., "CSV", "PARQUET").
-        schema: Optional schema. If None and autodetect is True, schema will be auto-detected.
+        source_format: BigQuery source format.
+        schema: Schema fields. Auto-detected if None and autodetect=True.
         write_disposition: How to handle existing data.
-        skip_leading_rows: Number of header rows to skip (CSV only).
+        skip_leading_rows: Header rows to skip (CSV only).
         field_delimiter: Field delimiter (CSV only).
         autodetect: Whether to auto-detect schema.
 
@@ -91,20 +60,13 @@ def create_load_job_config(
         write_disposition=write_disposition,
     )
 
-    # Set schema or autodetect
     if schema:
         job_config.schema = schema
     elif autodetect:
         job_config.autodetect = True
 
-    # CSV-specific options
     if source_format == "CSV":
-        # Default to skip 1 row for CSV if not specified
-        if skip_leading_rows is not None:
-            job_config.skip_leading_rows = skip_leading_rows
-        else:
-            job_config.skip_leading_rows = 1
-
+        job_config.skip_leading_rows = skip_leading_rows if skip_leading_rows is not None else 1
         if field_delimiter is not None:
             job_config.field_delimiter = field_delimiter
 
