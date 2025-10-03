@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Optional, Literal, Union
 from pathlib import Path
 import pandas as pd
+from .validation import validate_identifier
 
 if TYPE_CHECKING:
     from google.cloud import bigquery
@@ -32,9 +33,9 @@ class Table:
             project_id: The project ID containing the dataset.
         """
         self._client = client
-        self._table_id = table_id
-        self._dataset_id = dataset_id
-        self._project_id = project_id
+        self._table_id = validate_identifier(table_id, "table_id")
+        self._dataset_id = validate_identifier(dataset_id, "dataset_id")
+        self._project_id = validate_identifier(project_id, "project_id")
 
     @property
     def id(self) -> str:
@@ -68,7 +69,14 @@ class Table:
         Returns:
             DataFrame with table data.
         """
-        query = f"SELECT * FROM `{self.id}`{f' LIMIT {max_results}' if max_results else ''}"
+        query = f"SELECT * FROM `{self.id}`"
+        if max_results is not None:
+            query += " LIMIT @max_results"
+            try:
+                params = {"max_results": int(max_results)}
+            except (ValueError, TypeError):
+                raise ValueError(f"max_results must be an integer: {max_results}")
+            return self._client.query(query, params=params).to_dataframe()
         return self._client.query(query).to_dataframe()
 
     def write(
@@ -121,11 +129,9 @@ class Table:
                     source_format = gcs_formats[ext]
 
                 if schema is not None:
-                    schema_fields = dict_to_schema_fields(schema)
-                    autodetect = False
+                    schema_fields, autodetect = dict_to_schema_fields(schema), False
                 else:
-                    schema_fields = None
-                    autodetect = True
+                    schema_fields, autodetect = None, True
 
                 job_config = create_load_job_config(
                     source_format=source_format,
@@ -148,11 +154,9 @@ class Table:
                 source_format = detect_source_format(file_path)
 
             if schema is not None:
-                schema_fields = dict_to_schema_fields(schema)
-                autodetect = False
+                schema_fields, autodetect = dict_to_schema_fields(schema), False
             else:
-                schema_fields = None
-                autodetect = True
+                schema_fields, autodetect = None, True
 
             job_config = create_load_job_config(
                 source_format=source_format,

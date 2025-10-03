@@ -1,6 +1,7 @@
 """BigQuery Dataset class for gcpeasy."""
 
 from typing import TYPE_CHECKING, Optional
+from .validation import validate_identifier
 
 if TYPE_CHECKING:
     from google.cloud import bigquery
@@ -21,8 +22,8 @@ class Dataset:
             project_id: Project ID.
         """
         self._client = client
-        self._dataset_id = dataset_id
-        self._project_id = project_id
+        self._dataset_id = validate_identifier(dataset_id, "dataset_id")
+        self._project_id = validate_identifier(project_id, "project_id")
 
     @property
     def id(self) -> str:
