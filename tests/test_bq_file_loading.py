@@ -1,14 +1,13 @@
 """Tests for BigQuery file loading functionality."""
 
 import pytest
-import pandas as pd
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import Mock, patch, mock_open
 from google.cloud import bigquery
 
 from gcpeasy.bq.file_utils import (
-    detect_source_format,
     create_load_job_config,
+    detect_source_format,
 )
 from gcpeasy.bq.table import Table
 
@@ -46,11 +45,48 @@ class TestDetectSourceFormat:
 
     def test_detecting_unsupported_format_should_raise_error(self):
         file_path = Path("data.txt")
-        with pytest.raises(ValueError, match="Unsupported file format: .txt"):
+        with pytest.raises(ValueError, match="Unsupported or undetected file format: Detected .txt"):
             detect_source_format(file_path)
 
     def test_detecting_format_should_be_case_insensitive(self):
         file_path = Path("data.CSV")
+        assert detect_source_format(file_path) == "CSV"
+    
+    def test_detecting_csv_format_string_should_return_csv(self):
+        file_path = "data.csv"
+        assert detect_source_format(file_path) == "CSV"
+
+    def test_detecting_json_format_string_should_return_newline_delimited_json(self):
+        file_path = "data.json"
+        assert detect_source_format(file_path) == "NEWLINE_DELIMITED_JSON"
+
+    def test_detecting_jsonl_format_string_should_return_newline_delimited_json(self):
+        file_path = "data.jsonl"
+        assert detect_source_format(file_path) == "NEWLINE_DELIMITED_JSON"
+
+    def test_detecting_ndjson_format_string_should_return_newline_delimited_json(self):
+        file_path = "data.ndjson"
+        assert detect_source_format(file_path) == "NEWLINE_DELIMITED_JSON"
+
+    def test_detecting_parquet_format_string_should_return_parquet(self):
+        file_path = "data.parquet"
+        assert detect_source_format(file_path) == "PARQUET"
+
+    def test_detecting_avro_format_string_should_return_avro(self):
+        file_path = "data.avro"
+        assert detect_source_format(file_path) == "AVRO"
+
+    def test_detecting_orc_format_string_should_return_orc(self):
+        file_path = "data.orc"
+        assert detect_source_format(file_path) == "ORC"
+
+    def test_detecting_unsupported_format_string_should_raise_error(self):
+        file_path = "data.txt"
+        with pytest.raises(ValueError, match="Unsupported or undetected file format: Detected .txt"):
+            detect_source_format(file_path)
+
+    def test_detecting_format_string_should_be_case_insensitive(self):
+        file_path = "data.CSV"
         assert detect_source_format(file_path) == "CSV"
 
 

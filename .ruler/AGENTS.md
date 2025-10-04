@@ -5,20 +5,7 @@
 - Test the code with `make test` each time you make a code change
 - Whenever you make a code change that adds or modifies the behavior of the code, you should add a test for that behavior
 - Use `uv` for managing dependencies and environment
-
-## Coding style
-The key philosophy is: be concise, leverage Python's dynamic nature, avoid verbosity, and prioritize readability of strict adherence to conventions.
-
-- Code should be compact and readable. If something can be written inline and still be readable do it, even if it's against PEP8 or common Python coding conventions. Aim at reducing noise, while conveying enough information within context.
-- Be synthetic! The code exmamples in the documentation will explain how things work. Developers using the library will have context about what they are doing and can always read the code
-- Don't go overboard with type hints. If a parameter accepts many different types, remove the type hints. Python is a dynamic language
-- Keep the docstrings short! Coding examples belong to the library documentation, not the docstrings.
-    - Argument names should carry most of the weight, keep the argument description to a minimum
-    - If an argument expects one of a handful of possibilities don't go overboard and describe each and everyone of them
-- When an import is used exclusively for type checking add `from typing import TYPE_CHECKING` and use top-level imports within an if statement
-- Python is a dynamic language. Let's take advantage of it. We don't write Java in Python, we write Python.
-- Short variables, function and method names are ok when it's clear what they mean. This is especially true for common iteration (e.g. `idx` for an index, `x, y` for coordinates, `o` for an object). If the iterator makes it clear what it contains, one letter variables are ok: `for t in tables:` it's perfectly acceptable
-- Variables representing collections shuold normally end with an `s`. This applies to single letter variables as well (e.g. `ts = tables()`)
+- When we find and fix a bug for existing code, we add regression tests if relevant
 
 ## Testing guidelines
 - Each test should test exactly one thing (ideally with a single assertion)
@@ -30,6 +17,7 @@ The key philosophy is: be concise, leverage Python's dynamic nature, avoid verbo
 - In other words: test the behavior, not the implementation, tehst the "what", not the "how"
 - Tests should be limited to public interfaces
 - Prefer dependency injections to mocks when possible
+- Regression tests should still be written to preserve behavior, not the implementation
 
 ## General API philosophy
 Each submodule of the library makes dealing with a GCP service in a ergonomic and opinionated way. 

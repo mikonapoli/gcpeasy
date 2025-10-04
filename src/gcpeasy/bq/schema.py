@@ -6,33 +6,13 @@ from google.cloud import bigquery
 
 
 def dict_to_schema_fields(schema_dict: dict[str, str]) -> list[bigquery.SchemaField]:
-    """Convert a dictionary to BigQuery SchemaField objects.
-
-    Args:
-        schema_dict: Dict mapping column names to type strings.
-
-    Returns:
-        List of SchemaField objects.
-    """
-    return [
-        bigquery.SchemaField(name, _normalize_type_name(type_str))
-        for name, type_str in schema_dict.items()
-    ]
+    """Convert a dictionary to BigQuery SchemaField objects."""
+    return [bigquery.SchemaField(name, _normalize_type_name(t)) for name, t in schema_dict.items()]
 
 
-def dataframe_to_schema_fields(df: pd.DataFrame) -> list[bigquery.SchemaField]:
-    """Infer BigQuery schema from a pandas DataFrame.
-
-    Args:
-        df: DataFrame to infer schema from.
-
-    Returns:
-        List of SchemaField objects.
-    """
-    return [
-        bigquery.SchemaField(str(col), _pandas_dtype_to_bigquery_type(dtype))
-        for col, dtype in df.dtypes.items()
-    ]
+def df_to_schema_fields(df: pd.DataFrame) -> list[bigquery.SchemaField]:
+    """Infer BigQuery schema from a pandas DataFrame."""
+    return [bigquery.SchemaField(str(col), _pandas_dtype_to_bigquery_type(dtype)) for col, dtype in df.dtypes.items()]
 
 
 def _normalize_type_name(type_str: str) -> str:

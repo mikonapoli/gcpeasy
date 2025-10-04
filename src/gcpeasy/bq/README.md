@@ -124,27 +124,30 @@ df = table.read(max_results=1000)
 ### Writing Data
 
 ```python
-# Write DataFrame
+# Write DataFrame (defaults: infers schema, WRITE_TRUNCATE)
 import pandas as pd
 df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [30, 25]})
 table.write(df)
 
-# Write from local file
+# Write from local file (auto-detects format from extension)
 table.write("data.csv")
 table.write("data.parquet")
 
-# Write from GCS
+# Write from GCS (auto-detects format)
 table.write("gs://my-bucket/data.csv")
 
-# Write with explicit schema
+# Write with explicit schema (disables auto-detection)
 schema = {"name": "STRING", "age": "INT64"}
 table.write(df, schema=schema)
 
 # Append instead of truncate
 table.write(df, write_disposition="WRITE_APPEND")
 
-# Create empty table with schema
+# Create empty table with schema only
 table.write(None, schema={"name": "STRING", "age": "INT64"})
+
+# CSV options: skip_leading_rows (default 1), field_delimiter (default ",")
+table.write("data.csv", skip_leading_rows=2, field_delimiter="|")
 ```
 
 ### Creating Tables
@@ -212,7 +215,7 @@ table.delete(not_found_ok=True)  # Don't error if missing
 ### Stream Inserts
 
 ```python
-# Insert rows for real-time ingestion
+# Insert rows for real-time ingestion (defaults: ignore_unknown_values=True, skip_invalid_rows=False)
 rows = [
     {"name": "Alice", "age": 30},
     {"name": "Bob", "age": 25}
@@ -225,13 +228,14 @@ if errors:
 ### Export to GCS
 
 ```python
-# Export to CSV
+# Export to CSV (defaults: format=CSV, compression=GZIP, print_header=True, field_delimiter=",")
 table.to_gcs("gs://my-bucket/exports/*.csv")
 
-# Export to Parquet
+# Export to Parquet with no compression
 table.to_gcs(
     "gs://my-bucket/exports/*.parquet",
-    export_format="PARQUET"
+    export_format="PARQUET",
+    compression="NONE"
 )
 
 # Wait for completion
@@ -242,7 +246,7 @@ job.result()
 ### Copy Tables
 
 ```python
-# Copy table
+# Copy table (default: WRITE_TRUNCATE)
 source = client.dataset("dataset1").table("table1")
 dest = client.dataset("dataset2").table("table2")
 
@@ -256,11 +260,11 @@ source.copy(dest, write_disposition="WRITE_APPEND")
 ## Loading Data (Client-Level Convenience)
 
 ```python
-# Load DataFrame
+# Load DataFrame (default: WRITE_APPEND)
 df = pd.DataFrame({"name": ["Alice"], "age": [30]})
 client.load_data(df, "my_dataset.my_table")
 
-# Load from file
+# Load from file (auto-detects format)
 client.load_data("data.csv", "my_dataset.my_table")
 
 # With explicit format and schema
@@ -275,19 +279,19 @@ client.load_data(
 
 ## Working with Schemas
 
-The library accepts schemas as simple dictionaries:
+Schemas are simple dictionaries. Type aliases are auto-normalized:
 
 ```python
 schema = {
     "name": "STRING",
-    "age": "INTEGER",      # Normalized to INT64
-    "score": "FLOAT",      # Normalized to FLOAT64
-    "active": "BOOL",      # Normalized to BOOLEAN
+    "age": "INTEGER",      # → INT64
+    "score": "FLOAT",      # → FLOAT64
+    "active": "BOOL",      # → BOOLEAN
     "created": "TIMESTAMP"
 }
 ```
 
-Type aliases are automatically normalized:
+**Type normalizations:**
 - `INTEGER`, `INT`, `BIGINT` → `INT64`
 - `FLOAT`, `DOUBLE` → `FLOAT64`
 - `BOOL` → `BOOLEAN`
@@ -307,22 +311,18 @@ job = gcp_client.extract_table(...)
 
 ## Write Dispositions
 
-When writing data, control how existing data is handled:
+- `WRITE_TRUNCATE`: Overwrite (default for `table.write()`)
+- `WRITE_APPEND`: Append (default for `client.load_data()`)
+- `WRITE_EMPTY`: Only write if empty (fails otherwise)
 
-- `WRITE_TRUNCATE`: Overwrite existing data (default for `table.write()`)
-- `WRITE_APPEND`: Append to existing data (default for `client.load_data()`)
-- `WRITE_EMPTY`: Only write if table is empty (fails otherwise)
+## File Formats
 
-## File Format Support
-
-Supported file formats for loading:
-- CSV (`.csv`)
-- JSON (`.json`, `.jsonl`, `.ndjson`)
-- Parquet (`.parquet`)
-- Avro (`.avro`)
-- ORC (`.orc`)
-
-Format is auto-detected from file extension.
+Auto-detected from extension:
+- CSV: `.csv`
+- JSON: `.json`, `.jsonl`, `.ndjson`
+- Parquet: `.parquet`
+- Avro: `.avro`
+- ORC: `.orc`
 
 ## Examples
 

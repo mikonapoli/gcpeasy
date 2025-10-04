@@ -229,7 +229,7 @@ class TestTableWriteGCS:
         mock_client = Mock()
         table = Table(mock_client, "test_table", "test_dataset", "test_project")
 
-        with pytest.raises(ValueError, match="Cannot detect format from GCS URI"):
+        with pytest.raises(ValueError, match="Unsupported or undetected file format"):
             table.write("gs://bucket/data")
 
     def test_writing_gcs_with_explicit_format_should_use_it(self):

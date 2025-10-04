@@ -6,7 +6,7 @@ import pandas as pd
 from google.cloud import bigquery
 
 from gcpeasy.bq import init
-from gcpeasy.bq.schema import dict_to_schema_fields, dataframe_to_schema_fields
+from gcpeasy.bq.schema import dict_to_schema_fields, df_to_schema_fields
 
 
 class TestSchemaConversion:
@@ -26,7 +26,7 @@ class TestSchemaConversion:
         assert fields[2].name == "score"
         assert fields[2].field_type == "FLOAT64"  # FLOAT normalized to FLOAT64
 
-    def test_dataframe_to_schema_fields(self):
+    def test_df_to_schema_fields(self):
         """Test inferring schema from DataFrame."""
         df = pd.DataFrame({
             "name": ["Alice", "Bob"],
@@ -34,7 +34,7 @@ class TestSchemaConversion:
             "score": [95.5, 87.3],
             "active": [True, False],
         })
-        fields = dataframe_to_schema_fields(df)
+        fields = df_to_schema_fields(df)
 
         assert len(fields) == 4
         assert fields[0].name == "name"

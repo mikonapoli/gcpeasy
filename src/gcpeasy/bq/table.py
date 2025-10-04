@@ -2,8 +2,10 @@
 
 from typing import TYPE_CHECKING, Optional, Literal, Union
 from pathlib import Path
+from google.cloud import bigquery
 import pandas as pd
 from .validation import validate_identifier
+from .schema import dict_to_schema_fields, df_to_schema_fields
 
 if TYPE_CHECKING:
     from google.cloud import bigquery
@@ -39,19 +41,11 @@ class Table:
 
     @property
     def id(self) -> str:
-        """Get the fully qualified table ID.
-
-        Returns:
-            Fully qualified table ID in format 'project.dataset.table'.
-        """
+        """The fully qualified table ID in format 'project.dataset.table'."""
         return f"{self._project_id}.{self._dataset_id}.{self._table_id}"
 
     def exists(self) -> bool:
-        """Check if the table exists.
-
-        Returns:
-            True if exists, False otherwise.
-        """
+        """Check if the table exists."""
         from google.api_core import exceptions
 
         try:
@@ -98,8 +92,6 @@ class Table:
             skip_leading_rows: Header rows to skip (CSV only).
             field_delimiter: Field delimiter (CSV only).
         """
-        from google.cloud import bigquery
-        from .schema import dict_to_schema_fields, dataframe_to_schema_fields
         from .file_utils import detect_source_format, create_load_job_config
 
         if data is None:
@@ -111,63 +103,26 @@ class Table:
             return
 
         if isinstance(data, (str, Path)):
-            data_str = str(data)
-
-            if data_str.startswith("gs://"):
-                if source_format is None:
-                    gcs_formats = {
-                        ".csv": "CSV", ".json": "NEWLINE_DELIMITED_JSON",
-                        ".jsonl": "NEWLINE_DELIMITED_JSON", ".ndjson": "NEWLINE_DELIMITED_JSON",
-                        ".parquet": "PARQUET", ".avro": "AVRO", ".orc": "ORC",
-                    }
-                    ext = next((e for e in gcs_formats if data_str.endswith(e)), None)
-                    if not ext:
-                        raise ValueError(
-                            f"Cannot detect format from GCS URI: {data_str}. "
-                            "Please provide source_format parameter."
-                        )
-                    source_format = gcs_formats[ext]
-
-                if schema is not None:
-                    schema_fields, autodetect = dict_to_schema_fields(schema), False
-                else:
-                    schema_fields, autodetect = None, True
-
-                job_config = create_load_job_config(
+            source_format = source_format or detect_source_format(data)
+            
+            job_config = create_load_job_config(
                     source_format=source_format,
-                    schema=schema_fields,
+                    schema=dict_to_schema_fields(schema) if schema is not None else None,
                     write_disposition=write_disposition,
                     skip_leading_rows=skip_leading_rows,
                     field_delimiter=field_delimiter,
-                    autodetect=autodetect,
+                    autodetect=schema is None,
                 )
 
+            if str(data).startswith("gs://"):
+
                 load_job = self._client.load_table_from_uri(
-                    data_str, self.id, job_config=job_config
+                    data, self.id, job_config=job_config
                 )
                 load_job.result()
                 return
 
-            file_path = Path(data) if isinstance(data, str) else data
-
-            if source_format is None:
-                source_format = detect_source_format(file_path)
-
-            if schema is not None:
-                schema_fields, autodetect = dict_to_schema_fields(schema), False
-            else:
-                schema_fields, autodetect = None, True
-
-            job_config = create_load_job_config(
-                source_format=source_format,
-                schema=schema_fields,
-                write_disposition=write_disposition,
-                skip_leading_rows=skip_leading_rows,
-                field_delimiter=field_delimiter,
-                autodetect=autodetect,
-            )
-
-            with open(file_path, "rb") as source_file:
+            with open(Path(data), "rb") as source_file:
                 load_job = self._client.load_table_from_file(
                     source_file, self.id, job_config=job_config
                 )
@@ -175,11 +130,8 @@ class Table:
             return
 
         if isinstance(data, pd.DataFrame):
-            if schema is not None:
-                schema_fields = dict_to_schema_fields(schema)
-            else:
-                schema_fields = dataframe_to_schema_fields(data)
-
+            schema_fields = dict_to_schema_fields(schema) if schema is not None else df_to_schema_fields(data)
+            
             job_config = bigquery.LoadJobConfig(
                 schema=schema_fields,
                 write_disposition=write_disposition,
@@ -216,29 +168,19 @@ class Table:
         Returns:
             Self for chaining.
         """
-        from google.cloud import bigquery
         from google.api_core import exceptions
-        from .schema import dict_to_schema_fields
 
         table_ref = bigquery.Table(self.id)
         table_ref.schema = dict_to_schema_fields(schema)
 
-        if description:
-            table_ref.description = description
-
-        if partitioning_field:
-            table_ref.time_partitioning = bigquery.TimePartitioning(
-                field=partitioning_field
-            )
-
-        if clustering_fields:
-            table_ref.clustering_fields = clustering_fields
+        if description: table_ref.description = description
+        if partitioning_field: table_ref.time_partitioning = bigquery.TimePartitioning(field=partitioning_field)
+        if clustering_fields: table_ref.clustering_fields = clustering_fields
 
         try:
             self._client.create_table(table_ref)
         except exceptions.Conflict:
-            if not exists_ok:
-                raise
+            if not exists_ok: raise
 
         return self
 
@@ -253,149 +195,44 @@ class Table:
         try:
             self._client.delete_table(self.id, not_found_ok=False)
         except exceptions.NotFound:
-            if not not_found_ok:
-                raise
+            if not not_found_ok: raise
 
     def get_metadata(self) -> "bigquery.Table":
-        """Get table metadata and properties.
-
-        Returns:
-            BigQuery Table object with full metadata.
-        """
+        """Get table metadata and properties."""
         return self._client.get_table(self.id)
 
     def get_schema(self) -> list["bigquery.SchemaField"]:
-        """Get table schema.
+        """Get table schema."""
+        return self._client.get_table(self.id).schema
 
-        Returns:
-            List of SchemaField objects.
-        """
-        table_ref = self._client.get_table(self.id)
-        return table_ref.schema
+    def update(self, schema: Optional[dict[str, str]] = None, description: Optional[str] = None, labels: Optional[dict[str, str]] = None) -> "Table":
+        """Update table properties."""
+        t = self._client.get_table(self.id)
+        if schema is not None: t.schema = list(t.schema) + dict_to_schema_fields(schema)
+        if description is not None: t.description = description
+        if labels is not None: t.labels = labels
 
-    def update(
-        self,
-        schema: Optional[dict[str, str]] = None,
-        description: Optional[str] = None,
-        labels: Optional[dict[str, str]] = None,
-    ) -> "Table":
-        """Update table properties.
-
-        Args:
-            schema: Fields to add (cannot remove fields).
-            description: New description.
-            labels: Labels to set.
-
-        Returns:
-            Self for chaining.
-        """
-        from google.cloud import bigquery
-        from .schema import dict_to_schema_fields
-
-        table_ref = self._client.get_table(self.id)
-
-        if schema is not None:
-            new_fields = dict_to_schema_fields(schema)
-            table_ref.schema = list(table_ref.schema) + new_fields
-        if description is not None:
-            table_ref.description = description
-        if labels is not None:
-            table_ref.labels = labels
-
-        fields_to_update = [
-            field for field, value in [
-                ("schema", schema),
-                ("description", description),
-                ("labels", labels),
-            ] if value is not None
-        ]
-
-        if fields_to_update:
-            self._client.update_table(table_ref, fields_to_update)
-
+        fields = [f for f, v in [("schema", schema), ("description", description), ("labels", labels)] if v is not None]
+        if fields: self._client.update_table(t, fields)
         return self
 
-    def insert(
-        self,
-        rows: list[dict],
-        ignore_unknown_values: bool = True,
-        skip_invalid_rows: bool = False,
-    ) -> list:
-        """Stream insert rows into this table (for real-time ingestion).
+    def insert(self, rows: list[dict], ignore_unknown_values: bool = True, skip_invalid_rows: bool = False) -> list:
+        """Stream insert rows into this table (for real-time ingestion)."""
+        return self._client.insert_rows_json(self.id, rows, ignore_unknown_values=ignore_unknown_values, skip_invalid_rows=skip_invalid_rows)
 
-        Args:
-            rows: List of dicts representing rows.
-            ignore_unknown_values: Ignore row values not in schema.
-            skip_invalid_rows: Skip rows with invalid data.
-
-        Returns:
-            List of errors (empty if successful).
-        """
-        errors = self._client.insert_rows_json(
-            self.id,
-            rows,
-            ignore_unknown_values=ignore_unknown_values,
-            skip_invalid_rows=skip_invalid_rows,
-        )
-        return errors
-
-    def to_gcs(
-        self,
-        destination_uri: str,
-        export_format: str = "CSV",
-        compression: str = "GZIP",
-        print_header: bool = True,
-        field_delimiter: str = ",",
-    ) -> "bigquery.ExtractJob":
-        """Export this table to Google Cloud Storage.
-
-        Args:
-            destination_uri: GCS destination URI.
-            export_format: CSV, NEWLINE_DELIMITED_JSON, AVRO, or PARQUET.
-            compression: NONE, GZIP, or SNAPPY.
-            print_header: Include header row (CSV only).
-            field_delimiter: Field delimiter (CSV only).
-
-        Returns:
-            Extract job.
-        """
-        from google.cloud import bigquery
-
-        job_config = bigquery.ExtractJobConfig()
-        job_config.destination_format = export_format
-        job_config.compression = compression
-
+    def to_gcs(self, destination_uri: str, export_format: str = "CSV", compression: str = "GZIP", print_header: bool = True, field_delimiter: str = ",") -> "bigquery.ExtractJob":
+        """Export this table to Google Cloud Storage."""
+        config = bigquery.ExtractJobConfig()
+        config.destination_format = export_format
+        config.compression = compression
         if export_format == "CSV":
-            job_config.print_header = print_header
-            job_config.field_delimiter = field_delimiter
+            config.print_header = print_header
+            config.field_delimiter = field_delimiter
+        return self._client.extract_table(self.id, destination_uri, job_config=config)
 
-        extract_job = self._client.extract_table(
-            self.id, destination_uri, job_config=job_config
-        )
-
-        return extract_job
-
-    def copy(
-        self,
-        destination_table: Union[str, "Table"],
-        write_disposition: WriteDisposition = "WRITE_TRUNCATE",
-    ) -> "bigquery.CopyJob":
-        """Copy this table to another location.
-
-        Args:
-            destination_table: Destination Table or table ID string.
-            write_disposition: How to handle existing destination.
-
-        Returns:
-            Copy job.
-        """
-        from google.cloud import bigquery
-
+    def copy(self, destination_table: Union[str, "Table"], write_disposition: WriteDisposition = "WRITE_TRUNCATE") -> "bigquery.CopyJob":
+        """Copy this table to another location."""
         dest_id = destination_table if isinstance(destination_table, str) else destination_table.id
-
-        job_config = bigquery.CopyJobConfig()
-        job_config.write_disposition = write_disposition
-
-        copy_job = self._client.copy_table(self.id, dest_id, job_config=job_config)
-
-        return copy_job
+        config = bigquery.CopyJobConfig()
+        config.write_disposition = write_disposition
+        return self._client.copy_table(self.id, dest_id, job_config=config)
