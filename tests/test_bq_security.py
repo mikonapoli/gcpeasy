@@ -157,8 +157,9 @@ class TestSQLInjectionPrevention:
         table.read(max_results=100)
 
         call_args = mock_bq_client.return_value.query.call_args
-
-        assert call_args[1]["params"] == {"max_results": 100}
+        job_config = call_args[1]["job_config"]
+        assert job_config.query_parameters[0].name == "max_results"
+        assert job_config.query_parameters[0].value == 100
 
 
 class TestIdentifierValidation:
@@ -386,7 +387,8 @@ class TestMaxResultsTypeHandling:
         table.read(max_results=100)
 
         call_args = mock_bq_client.return_value.query.call_args
-        assert call_args[1]["params"]["max_results"] == 100
+        job_config = call_args[1]["job_config"]
+        assert job_config.query_parameters[0].value == 100
 
     @patch("gcpeasy.bq.client.bigquery.Client")
     def test_reading_with_float_max_results_should_convert_to_int(self, mock_bq_client):
@@ -404,7 +406,8 @@ class TestMaxResultsTypeHandling:
         table.read(max_results=100.5)
 
         call_args = mock_bq_client.return_value.query.call_args
-        assert call_args[1]["params"]["max_results"] == 100
+        job_config = call_args[1]["job_config"]
+        assert job_config.query_parameters[0].value == 100
 
     @patch("gcpeasy.bq.client.bigquery.Client")
     def test_reading_with_dict_max_results_should_fail(self, mock_bq_client):

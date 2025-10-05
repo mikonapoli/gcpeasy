@@ -117,10 +117,10 @@ class TestTable:
 
         call_args = mock_bq_client.return_value.query.call_args
         query = call_args[0][0]
-        # Should use parameterized query for security
         assert "LIMIT @max_results" in query
-        # Should pass params dict
-        assert call_args[1]["params"] == {"max_results": 100}
+        job_config = call_args[1]["job_config"]
+        assert job_config.query_parameters[0].name == "max_results"
+        assert job_config.query_parameters[0].value == 100
 
     @patch("gcpeasy.bq.client.bigquery.Client")
     def test_read_with_max_results_should_return_dataframe(self, mock_bq_client):

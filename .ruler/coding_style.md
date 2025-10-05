@@ -1,4 +1,4 @@
-# Coding Style Guidelines (Revised)
+# Coding Style Guidelines
 
 **Key philosophy**: Be concise, leverage Python's dynamic nature, avoid verbosity, and prioritize readability over strict adherence to conventions.
 

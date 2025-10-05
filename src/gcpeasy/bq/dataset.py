@@ -8,10 +8,7 @@ if TYPE_CHECKING:
 
 
 class Dataset:
-    """Represents a BigQuery dataset.
-
-    Provides methods to interact with and manage BigQuery datasets.
-    """
+    """Represents a BigQuery dataset."""
 
     def __init__(self, client: "bigquery.Client", dataset_id: str, project_id: str):
         self._client = client
@@ -24,7 +21,7 @@ class Dataset:
         return f"{self._project_id}.{self._dataset_id}"
 
     def exists(self) -> bool:
-        """Check if the dataset exists."""
+        """Whether the dataset exists."""
         from google.api_core import exceptions
         try:
             self._client.get_dataset(self.id)
@@ -33,11 +30,11 @@ class Dataset:
             return False
 
     def tables(self, max_results: Optional[int] = None) -> list[str]:
-        """List all tables in the dataset."""
+        """Table IDs in this dataset."""
         return [t.table_id for t in self._client.list_tables(self.id, max_results=max_results)]
 
     def table(self, table_id: str) -> "Table":
-        """Get a Table object."""
+        """Get a Table object for the given table_id."""
         from .table import Table
         return Table(self._client, table_id, self._dataset_id, self._project_id)
 
@@ -67,7 +64,7 @@ class Dataset:
             if not not_found_ok: raise
 
     def get_metadata(self) -> "bigquery.Dataset":
-        """Get dataset metadata."""
+        """The dataset metadata."""
         return self._client.get_dataset(self.id)
 
     def update(self, description: Optional[str] = None, labels: Optional[dict[str, str]] = None, default_table_expiration_ms: Optional[int] = None) -> "Dataset":

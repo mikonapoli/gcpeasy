@@ -53,6 +53,24 @@ for row in client("SELECT * FROM huge_table", to_dataframe=False):
     print(row)
 ```
 
+```python
+from google.cloud import bigquery
+
+# Attach a default job config (reused by every call)
+default_config = bigquery.QueryJobConfig(priority=bigquery.QueryPriority.BATCH)
+client = bq.init(default_job_config=default_config)
+
+# Override per-call configuration
+custom_config = bigquery.QueryJobConfig(use_legacy_sql=False)
+client.query("SELECT 1", job_config=custom_config)
+```
+
+- Returns a pandas `DataFrame` by default; set `to_dataframe=False` to work with the underlying `RowIterator` directly.
+- Attaching `params` auto-converts scalar Python types (`bool→BOOL`, `int→INT64`, `float→FLOAT64`, `str→STRING`, `bytes→BYTES`). Everything else falls back to `STRING`.
+- Parameter binding here is scalar-only. Use your own `QueryJobConfig` if you need arrays or structs.
+- Passing a `QueryJobConfig` (either at init or per call) reuses the same object. If you mutate it—for example by adding parameters—those changes persist for the next query unless you pass a fresh config.
+- Client location defaults to `EU`; override with `bq.init(project_id="...", location="US")` when necessary.
+
 ### Listing Datasets and Tables
 
 ```python
@@ -100,6 +118,12 @@ print(metadata.location)
 print(metadata.created)
 ```
 
+Notes:
+- Dataset IDs are validated up front. Empty strings or IDs with invalid characters raise `ValueError` before any API call is made.
+- `dataset.create()` inherits the client's project and location unless you override them explicitly.
+- `dataset.delete(delete_contents=False)` mirrors the BigQuery REST API: set `delete_contents=True` to cascade tables, and `not_found_ok=True` to silence missing datasets.
+- `dataset.update()` only touches the fields you pass; omitted values are left unchanged.
+
 ## Table Operations
 
 ### Getting Tables
@@ -120,6 +144,8 @@ df = table.read()
 # Read with limit
 df = table.read(max_results=1000)
 ```
+
+`max_results` is validated and coerced to an integer before being bound as a parameter; passing a non-numeric value raises `ValueError` rather than issuing a malformed query.
 
 ### Writing Data
 
@@ -149,6 +175,15 @@ table.write(None, schema={"name": "STRING", "age": "INT64"})
 # CSV options: skip_leading_rows (default 1), field_delimiter (default ",")
 table.write("data.csv", skip_leading_rows=2, field_delimiter="|")
 ```
+
+Behaviour summary:
+- DataFrames are loaded with `load_table_from_dataframe`. When no schema is supplied we infer one from the pandas dtypes (`int`→`INT64`, `float`→`FLOAT64`, `bool`→`BOOLEAN`, `datetime64`→`TIMESTAMP`, everything else→`STRING`).
+- String or `Path` inputs call the appropriate load job. Local paths stream the file, while `gs://` URIs trigger a server-side job (wildcards are supported).
+- File formats are auto-detected from the extension; unsupported extensions raise an explicit `ValueError` before submitting a job.
+- When you supply a schema for file loads we attach it verbatim; otherwise BigQuery autodetects it. For CSV loads we default to `skip_leading_rows=1` so header rows are ignored unless you override it.
+- Passing `data=None` with a schema creates the table if it does not exist. Existing tables are left untouched thanks to `exists_ok=True` under the hood.
+- The default write disposition here is `WRITE_TRUNCATE`. Use the client-level helper if you would rather append by default.
+- Unsupported input types raise `TypeError` immediately, keeping the behaviour explicit.
 
 ### Creating Tables
 
@@ -188,6 +223,8 @@ table.update(
 table.update(schema={"new_field": "STRING"})
 ```
 
+Schema updates are additive only: new fields are appended to the existing schema. To alter or drop fields, fall back to the raw BigQuery client via `client._gcp`.
+
 ### Other Table Operations
 
 ```python
@@ -210,6 +247,9 @@ table.delete()
 table.delete(not_found_ok=True)  # Don't error if missing
 ```
 
+- `table.exists()` and `table.get_metadata()` share the same identifier validation guarantees as dataset operations.
+- `table.delete(not_found_ok=True)` mirrors the dataset helper by swallowing `NotFound` so you can clean up idempotently.
+
 ## Advanced Operations
 
 ### Stream Inserts
@@ -224,6 +264,8 @@ errors = table.insert(rows)
 if errors:
     print(f"Errors: {errors}")
 ```
+
+The method returns the raw error payload from `insert_rows_json`. An empty list means the insert succeeded.
 
 ### Export to GCS
 
@@ -243,6 +285,8 @@ job = table.to_gcs("gs://my-bucket/data.csv")
 job.result()
 ```
 
+Extract jobs are asynchronous just like the official client. Use `job.result()` to block until completion or poll manually for long exports.
+
 ### Copy Tables
 
 ```python
@@ -256,6 +300,8 @@ job.result()  # Wait for completion
 # Append instead of truncate
 source.copy(dest, write_disposition="WRITE_APPEND")
 ```
+
+You can also pass fully-qualified string IDs (`"project.dataset.table"`) instead of `Table` objects for the destination.
 
 ## Loading Data (Client-Level Convenience)
 
@@ -277,6 +323,10 @@ client.load_data(
 )
 ```
 
+- Accepts table IDs in both `dataset.table` and `project.dataset.table` form; anything else raises a `ValueError` before hitting the API.
+- Under the hood this simply routes to `dataset(...).table(...).write(...)`, so all the behaviours described in the table section apply here as well—only the default write disposition changes to `WRITE_APPEND`.
+- When loading local files, CSV defaults (`skip_leading_rows=1`, comma delimiter) still apply unless you override them in the method call.
+
 ## Working with Schemas
 
 Schemas are simple dictionaries. Type aliases are auto-normalized:
@@ -296,6 +346,18 @@ schema = {
 - `FLOAT`, `DOUBLE` → `FLOAT64`
 - `BOOL` → `BOOLEAN`
 - `TEXT`, `VARCHAR` → `STRING`
+
+DataFrame inference mirrors the helper used by `table.write(df)`: integer dtypes map to `INT64`, floats to `FLOAT64`, `bool` to `BOOLEAN`, `datetime64` to `TIMESTAMP`, and everything else (including `object`) becomes `STRING`.
+
+## Identifier Validation
+
+Dataset, table, and project IDs are validated before we call the API:
+
+- Dataset/table IDs must start with a letter or underscore and contain only letters, numbers, and underscores.
+- Project IDs must start with a letter and can include numbers, hyphens, underscores, and apostrophes.
+- Empty identifiers—or anything longer than 1024 characters—raise `ValueError` immediately.
+
+This keeps typos from being sent to BigQuery and makes failures easier to debug locally.
 
 ## Access to Underlying Client
 
