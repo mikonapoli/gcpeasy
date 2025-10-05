@@ -2,6 +2,7 @@
 
 import json
 import re
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -211,6 +212,57 @@ class Client:
             if uppercase_keys:
                 key = key.upper()
             result[key] = value
+        return result
+
+    def get_many(self, secrets) -> dict[str, Any]:
+        """
+        Retrieve multiple secrets in one call.
+
+        Accepts:
+        - Iterable of secret IDs: ["secret1", "secret2"]
+        - Mapping with aliases: {"alias": "secret-id"} or {"alias": ("secret-id", options)} or {"alias": {"secret": "id", ...}}
+        """
+        # Handle mapping (dict, UserDict, MappingProxyType, etc.)
+        if isinstance(secrets, Mapping):
+            result = {}
+            for alias, spec in secrets.items():
+                # Simple string: alias -> secret_id
+                if isinstance(spec, str):
+                    result[alias] = self.get(spec)
+                # Tuple: (secret_id, options_dict)
+                elif isinstance(spec, tuple):
+                    if len(spec) != 2:
+                        raise ValueError(
+                            f"Tuple spec must be (secret_id, options), got {len(spec)} elements for {alias!r}"
+                        )
+                    secret_id, options = spec
+                    if not isinstance(secret_id, str):
+                        raise TypeError(f"Secret ID must be string, got {type(secret_id).__name__} for {alias!r}")
+                    if not isinstance(options, dict):
+                        raise TypeError(f"Options must be dict, got {type(options).__name__} for {alias!r}")
+                    result[alias] = self.get(secret_id, **options)
+                # Dict: {"secret": "id", "version": 2, "as_json": True, ...}
+                elif isinstance(spec, dict):
+                    if "secret" not in spec:
+                        raise ValueError(f"Dict spec must contain 'secret' key for {alias!r}")
+                    secret_id = spec["secret"]
+                    if not isinstance(secret_id, str):
+                        raise TypeError(f"Secret ID must be string, got {type(secret_id).__name__} for {alias!r}")
+                    options = {k: v for k, v in spec.items() if k != "secret"}
+                    result[alias] = self.get(secret_id, **options)
+                else:
+                    raise TypeError(
+                        f"Invalid spec type for {alias!r}: expected str, tuple, or dict, "
+                        f"got {type(spec).__name__}"
+                    )
+            return result
+
+        # Handle iterable (list, tuple, set, etc.)
+        result = {}
+        for s in secrets:
+            if not isinstance(s, str):
+                raise TypeError(f"Secret ID must be string, got {type(s).__name__}")
+            result[s] = self.get(s)
         return result
 
     def get_path(self, path: str, *, as_json: bool = False, as_bytes: bool = False, default: Any = _UNSET) -> Any:

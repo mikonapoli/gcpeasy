@@ -1,6 +1,8 @@
 """Tests for Secret Manager client core functionality (Slice 1)."""
 
 import json
+from collections import UserDict
+from types import MappingProxyType
 from unittest.mock import Mock
 
 import pytest
@@ -524,3 +526,169 @@ def test_get_dict_handles_equals_in_value(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
     result = client.get_dict("env-file")
     assert result == {"JWT": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload=data"}
+
+
+def test_get_many_with_list_input(client, mock_gcp_client):
+    """Test get_many() should accept list of secret IDs."""
+    mock_gcp_client.access_secret_version.side_effect = [
+        _mock_response(b"value1"),
+        _mock_response(b"value2"),
+        _mock_response(b"value3"),
+    ]
+    result = client.get_many(["secret1", "secret2", "secret3"])
+    assert result == {"secret1": "value1", "secret2": "value2", "secret3": "value3"}
+    assert mock_gcp_client.access_secret_version.call_count == 3
+
+
+def test_get_many_with_dict_string_values(client, mock_gcp_client):
+    """Test get_many() should accept dict with string values for aliasing."""
+    mock_gcp_client.access_secret_version.side_effect = [
+        _mock_response(b"db-value"),
+        _mock_response(b"api-value"),
+    ]
+    result = client.get_many({"database": "db-secret", "api_key": "api-secret"})
+    assert result == {"database": "db-value", "api_key": "api-value"}
+
+
+def test_get_many_with_tuple_and_options(client, mock_gcp_client):
+    """Test get_many() should accept tuple format (secret_id, options)."""
+    mock_gcp_client.access_secret_version.side_effect = [
+        _mock_response(b"found"),
+        NotFound("missing"),
+    ]
+    result = client.get_many({
+        "secret1": ("actual-secret", {}),
+        "secret2": ("missing-secret", {"default": "fallback"}),
+    })
+    assert result == {"secret1": "found", "secret2": "fallback"}
+
+
+def test_get_many_with_dict_spec(client, mock_gcp_client):
+    """Test get_many() should accept dict spec with 'secret' key."""
+    mock_gcp_client.access_secret_version.side_effect = [
+        _mock_response(b'{"key": "value"}'),
+        _mock_response(b"text"),
+    ]
+    result = client.get_many({
+        "config": {"secret": "app-config", "as_json": True},
+        "password": {"secret": "db-password"},
+    })
+    assert result == {"config": {"key": "value"}, "password": "text"}
+
+
+def test_get_many_with_mixed_formats(client, mock_gcp_client):
+    """Test get_many() should handle mixed input formats."""
+    mock_gcp_client.access_secret_version.side_effect = [
+        _mock_response(b"simple"),
+        _mock_response(b"tuple-val"),
+        _mock_response(b'{"a": 1}'),
+    ]
+    result = client.get_many({
+        "alias1": "secret1",
+        "alias2": ("secret2", {}),
+        "alias3": {"secret": "secret3", "as_json": True},
+    })
+    assert result == {
+        "alias1": "simple",
+        "alias2": "tuple-val",
+        "alias3": {"a": 1},
+    }
+
+
+def test_get_many_with_version_option(client, mock_gcp_client):
+    """Test get_many() should pass through version option."""
+    mock_gcp_client.access_secret_version.return_value = _mock_response(b"v5-data")
+    result = client.get_many({"alias": {"secret": "my-secret", "version": 5}})
+    assert result == {"alias": "v5-data"}
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/my-secret/versions/5"
+    )
+
+
+def test_get_many_propagates_errors_without_default(client, mock_gcp_client):
+    """Test get_many() should propagate NotFound when no default provided."""
+    mock_gcp_client.access_secret_version.side_effect = NotFound("gone")
+    with pytest.raises(NotFound):
+        client.get_many(["missing-secret"])
+
+
+def test_get_many_returns_default_on_error(client, mock_gcp_client):
+    """Test get_many() should return default when NotFound and default provided."""
+    mock_gcp_client.access_secret_version.side_effect = NotFound("gone")
+    result = client.get_many({"alias": ("missing", {"default": "fallback"})})
+    assert result == {"alias": "fallback"}
+
+
+def test_get_many_raises_on_invalid_tuple_length(client):
+    """Test get_many() should reject tuples with wrong number of elements."""
+    with pytest.raises(ValueError, match="Tuple spec must be"):
+        client.get_many({"alias": ("only-one-element",)})
+    with pytest.raises(ValueError, match="Tuple spec must be"):
+        client.get_many({"alias": ("one", "two", "three")})
+
+
+def test_get_many_raises_on_dict_without_secret_key(client):
+    """Test get_many() should reject dict spec without 'secret' key."""
+    with pytest.raises(ValueError, match="must contain 'secret' key"):
+        client.get_many({"alias": {"version": 3, "as_json": True}})
+
+
+def test_get_many_raises_on_non_string_secret_id_in_list(client):
+    """Test get_many() should reject non-string secret IDs in list."""
+    with pytest.raises(TypeError, match="Secret ID must be string"):
+        client.get_many([123, "valid-secret"])
+
+
+def test_get_many_raises_on_non_string_secret_id_in_tuple(client):
+    """Test get_many() should reject non-string secret IDs in tuple."""
+    with pytest.raises(TypeError, match="Secret ID must be string"):
+        client.get_many({"alias": (123, {})})
+
+
+def test_get_many_raises_on_non_string_secret_in_dict(client):
+    """Test get_many() should reject non-string 'secret' in dict spec."""
+    with pytest.raises(TypeError, match="Secret ID must be string"):
+        client.get_many({"alias": {"secret": 123}})
+
+
+def test_get_many_raises_on_non_dict_options_in_tuple(client):
+    """Test get_many() should reject non-dict options in tuple."""
+    with pytest.raises(TypeError, match="Options must be dict"):
+        client.get_many({"alias": ("secret", "not-a-dict")})
+
+
+def test_get_many_raises_on_invalid_spec_type(client):
+    """Test get_many() should reject invalid spec types."""
+    with pytest.raises(TypeError, match="Invalid spec type"):
+        client.get_many({"alias": 123})
+    with pytest.raises(TypeError, match="Invalid spec type"):
+        client.get_many({"alias": ["list", "not", "allowed"]})
+
+
+def test_get_many_accepts_userdict(client, mock_gcp_client):
+    """Test get_many() should handle UserDict as mapping."""
+    mock_gcp_client.access_secret_version.return_value = _mock_response(b"value1")
+
+    class MyUserDict(UserDict):
+        pass
+
+    secrets = MyUserDict({"alias": "secret-id"})
+    result = client.get_many(secrets)
+
+    assert result == {"alias": "value1"}
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/secret-id/versions/latest"
+    )
+
+
+def test_get_many_accepts_mappingproxytype(client, mock_gcp_client):
+    """Test get_many() should handle MappingProxyType as mapping."""
+    mock_gcp_client.access_secret_version.return_value = _mock_response(b"value1")
+
+    secrets = MappingProxyType({"alias": "secret-id"})
+    result = client.get_many(secrets)
+
+    assert result == {"alias": "value1"}
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/secret-id/versions/latest"
+    )

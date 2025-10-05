@@ -34,6 +34,7 @@ Thin, value-centric slices to deliver the `gcpeasy.secretmanager` module. Unless
   - Validate input schema and surface helpful errors on misuse.
 - **Deliverables:** Dictionary-returning helper enabling atomic multi-secret fetches.
 - **Tests:** Cases covering list input, dict input with option tuples, default fallbacks, and propagation of errors when no default provided.
+- **✅ STATUS:** COMPLETE - Implemented `get_many()` with 15 comprehensive tests covering all input formats and error cases
 
 ## Slice 4 – Listing & Metadata Introspection **(independent)**
 - **Goal:** Allow users to explore and audit secrets without fetching payloads.
