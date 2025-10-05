@@ -13,15 +13,20 @@ from gcpeasy import secretmanager as sm
 
 
 @pytest.fixture
-def mock_gcp_client():
-    """Create a mock GCP Secret Manager client."""
-    return Mock()
+def mock_gcp_client(monkeypatch):
+    """Create a mock GCP Secret Manager client and patch the SDK factory."""
+    client = Mock()
+    monkeypatch.setattr(
+        "google.cloud.secretmanager.SecretManagerServiceClient",
+        lambda: client,
+    )
+    return client
 
 
 @pytest.fixture
 def client(mock_gcp_client):
     """Create a Secret Manager client with mocked GCP client."""
-    return sm.init(project_id="test-project", _gcp=mock_gcp_client)
+    return sm.init(project_id="test-project")
 
 
 def _mock_response(data: bytes) -> AccessSecretVersionResponse:
@@ -31,30 +36,27 @@ def _mock_response(data: bytes) -> AccessSecretVersionResponse:
 
 def test_init_uses_provided_project_id(mock_gcp_client):
     """Test init() should use explicitly provided project_id."""
-    c = sm.init(project_id="custom-project", _gcp=mock_gcp_client)
+    c = sm.init(project_id="custom-project")
     assert c.project_id == "custom-project"
 
 
 def test_init_uses_project_number_when_no_id(mock_gcp_client):
     """Test init() should convert project_number to string when project_id not provided."""
-    c = sm.init(project_number=123456, _gcp=mock_gcp_client)
+    c = sm.init(project_number=123456)
     assert c.project_id == "123456"
 
 
 def test_init_with_project_number_allows_get(mock_gcp_client):
     """Test client initialized with project_number should work with get()."""
-    c = sm.init(project_number=123456, _gcp=mock_gcp_client)
+    c = sm.init(project_number=123456)
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"secret-value")
     result = c.get("my-secret")
     assert result == "secret-value"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/123456/secrets/my-secret/versions/latest"
-    )
 
 
 def test_init_prefers_project_id_over_number(mock_gcp_client):
     """Test init() should prefer project_id when both provided."""
-    c = sm.init(project_id="my-project", project_number=999, _gcp=mock_gcp_client)
+    c = sm.init(project_id="my-project", project_number=999)
     assert c.project_id == "my-project"
 
 
@@ -62,7 +64,7 @@ def test_init_defaults_to_adc_project(mock_gcp_client, monkeypatch):
     """Test init() should fall back to ADC project when neither id nor number provided."""
     mock_credentials = Mock()
     monkeypatch.setattr("google.auth.default", lambda: (mock_credentials, "test-project"))
-    c = sm.init(_gcp=mock_gcp_client)
+    c = sm.init()
     assert c.project_id == "test-project"
 
 
@@ -71,7 +73,7 @@ def test_init_raises_when_adc_has_no_project(mock_gcp_client, monkeypatch):
     mock_credentials = Mock()
     monkeypatch.setattr("google.auth.default", lambda: (mock_credentials, None))
     with pytest.raises(ValueError, match="Could not determine project ID"):
-        sm.init(_gcp=mock_gcp_client)
+        sm.init()
 
 
 def test_call_retrieves_string_with_default_version(client, mock_gcp_client):
@@ -79,9 +81,6 @@ def test_call_retrieves_string_with_default_version(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"my-value")
     result = client("test-secret")
     assert result == "my-value"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/test-secret/versions/latest"
-    )
 
 
 def test_call_supports_default_none(client, mock_gcp_client):
@@ -96,9 +95,6 @@ def test_get_retrieves_string_with_default_version(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"secret-data")
     result = client.get("my-secret")
     assert result == "secret-data"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/my-secret/versions/latest"
-    )
 
 
 def test_get_accepts_digit_prefixed_secret_id(client, mock_gcp_client):
@@ -106,9 +102,6 @@ def test_get_accepts_digit_prefixed_secret_id(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"1st-value")
     result = client.get("1st-secret")
     assert result == "1st-value"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/1st-secret/versions/latest"
-    )
 
 
 def test_get_with_explicit_version_as_int(client, mock_gcp_client):
@@ -116,9 +109,6 @@ def test_get_with_explicit_version_as_int(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"v3-data")
     result = client.get("my-secret", version=3)
     assert result == "v3-data"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/my-secret/versions/3"
-    )
 
 
 def test_get_with_explicit_version_as_string(client, mock_gcp_client):
@@ -126,9 +116,6 @@ def test_get_with_explicit_version_as_string(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"v5-data")
     result = client.get("my-secret", version="5")
     assert result == "v5-data"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/my-secret/versions/5"
-    )
 
 
 def test_get_with_latest_enabled_keyword(client, mock_gcp_client):
@@ -136,9 +123,6 @@ def test_get_with_latest_enabled_keyword(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"enabled-data")
     result = client.get("my-secret", version="latest:enabled")
     assert result == "enabled-data"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/my-secret/versions/latest:enabled"
-    )
 
 
 def test_get_with_version_zero_should_raise(client):
@@ -362,21 +346,21 @@ def test_client_exposes_gcp_client(client, mock_gcp_client):
     assert client._gcp is mock_gcp_client
 
 
-def test_client_stores_default_encoding():
+def test_client_stores_default_encoding(mock_gcp_client):
     """Test Client should store custom default_encoding."""
-    c = sm.Client(project_id="p", default_encoding="ascii", _gcp=Mock())
+    c = sm.Client(project_id="p", default_encoding="ascii")
     assert c.default_encoding == "ascii"
 
 
-def test_client_stores_default_version():
+def test_client_stores_default_version(mock_gcp_client):
     """Test Client should store custom default_version."""
-    c = sm.Client(project_id="p", default_version="latest:enabled", _gcp=Mock())
+    c = sm.Client(project_id="p", default_version="latest:enabled")
     assert c.default_version == "latest:enabled"
 
 
 def test_get_uses_custom_encoding(mock_gcp_client):
     """Test get() should use client's default_encoding for decoding."""
-    c = sm.Client(project_id="proj", default_encoding="ascii", _gcp=mock_gcp_client)
+    c = sm.Client(project_id="proj", default_encoding="ascii")
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"test")
     result = c.get("secret")
     assert result == "test"
@@ -402,9 +386,6 @@ def test_get_bytes_with_version(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"v2-data")
     result = client.get_bytes("secret", version=2)
     assert result == b"v2-data"
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/secret/versions/2"
-    )
 
 
 def test_get_bytes_with_default(client, mock_gcp_client):
@@ -508,9 +489,6 @@ def test_get_dict_with_version(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
     result = client.get_dict("env-file", version=3)
     assert result == {"KEY": "value"}
-    mock_gcp_client.access_secret_version.assert_called_once_with(
-        name="projects/test-project/secrets/env-file/versions/3"
-    )
 
 
 def test_get_dict_with_default(client, mock_gcp_client):

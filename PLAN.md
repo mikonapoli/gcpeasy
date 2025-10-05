@@ -83,7 +83,6 @@ Thin, value-centric slices to deliver the `gcpeasy.secretmanager` module. Unless
 - **Goal:** Round out the module with validation, error messaging, and documentation wiring.
 - **Scope:**
   - Centralise identifier/version validation utilities and reuse across client/secret helpers; add targeted tests.
-  - Ensure `_gcp` property is exposed on the client (per README) and check any missing docstring or README cross-links.
   - Add regression tests for edge cases (e.g., conflicting flags, long IDs) not covered earlier.
   - Wire module into package exports (`__all__`, root README updates) if not already done.
 - **Deliverables:** Stable, well-tested module ready for release.
@@ -91,7 +90,15 @@ Thin, value-centric slices to deliver the `gcpeasy.secretmanager` module. Unless
 
 ---
 
+## Implementation Checklist (Apply to Every Slice)
+
+For each slice:
+1. Implement the functionality described in **Scope**
+2. Write comprehensive tests as specified in **Tests**
+3. **Update the README** with working examples demonstrating the new functionality
+4. Run the full test suite (`make test`) to ensure nothing broke
+5. Mark the slice as **✅ COMPLETE** in this file
+
 ## Notes
-- Each slice should update or add README examples/tests only for the behaviours introduced in that slice to keep review scope tight.
-- Prefer using dependency injection for the underlying GCP client to keep tests fast and deterministic.
+- **README updates are mandatory for each slice.** Add examples only for the current slice's functionality - don't document features from future slices.
 - When touching shared helpers, favour additive changes to minimise cross-slice conflicts.
