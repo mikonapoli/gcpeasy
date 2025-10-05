@@ -24,6 +24,7 @@ Thin, value-centric slices to deliver the `gcpeasy.secretmanager` module. Unless
   - Ensure newline default and custom separators behave as documented.
 - **Deliverables:** Additional helper methods expanding retrieval ergonomics without touching other features.
 - **Tests:** Mocked payload fixtures for env-style secrets verifying trimming, separator handling, uppercase flags, and delegation to `get`.
+- **✅ STATUS:** COMPLETE - Implemented `get_bytes()`, `get_json()`, and `get_dict()` with 17 comprehensive tests
 
 ## Slice 3 – Batch Retrieval (`get_many`) **(independent)**
 - **Goal:** Provide fast configuration hydration by fetching multiple secrets in one call.

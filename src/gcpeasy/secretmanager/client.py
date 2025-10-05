@@ -170,6 +170,49 @@ class Client:
             return json.loads(text)
         return text
 
+    def get_bytes(self, secret: str, *, version: str | int | None = None, default: Any = _UNSET) -> bytes:
+        """Retrieve secret as raw bytes."""
+        return self.get(secret, version=version, as_bytes=True, default=default)
+
+    def get_json(self, secret: str, *, version: str | int | None = None, default: Any = _UNSET) -> Any:
+        """Retrieve secret and parse as JSON."""
+        return self.get(secret, version=version, as_json=True, default=default)
+
+    def get_dict(
+        self,
+        secret: str,
+        *,
+        version: str | int | None = None,
+        line_separator: str = "\n",
+        key_separator: str = "=",
+        strip_keys: bool = True,
+        strip_values: bool = True,
+        uppercase_keys: bool = False,
+        default: Any = _UNSET,
+    ) -> dict[str, str]:
+        """
+        Retrieve secret as dict by parsing KEY=VALUE pairs.
+
+        Splits by line_separator (default newline), then by key_separator (default =).
+        """
+        text = self.get(secret, version=version, default=default)
+        if text is default:
+            return text
+
+        result = {}
+        for line in text.split(line_separator):
+            if not line or key_separator not in line:
+                continue
+            key, value = line.split(key_separator, 1)
+            if strip_keys:
+                key = key.strip()
+            if strip_values:
+                value = value.strip()
+            if uppercase_keys:
+                key = key.upper()
+            result[key] = value
+        return result
+
     def get_path(self, path: str, *, as_json: bool = False, as_bytes: bool = False, default: Any = _UNSET) -> Any:
         """Fetch a fully qualified resource path without project inference."""
         if not path.startswith("projects/"):

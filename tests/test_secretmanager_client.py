@@ -385,3 +385,142 @@ def test_malformed_json_raises_value_error(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.return_value = _mock_response(b"not json")
     with pytest.raises(ValueError):
         client.get("bad-json", as_json=True)
+
+
+def test_get_bytes_returns_raw_payload(client, mock_gcp_client):
+    """Test get_bytes() should return raw bytes."""
+    raw = b"\xde\xad\xbe\xef"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(raw)
+    result = client.get_bytes("binary-secret")
+    assert result == raw
+
+
+def test_get_bytes_with_version(client, mock_gcp_client):
+    """Test get_bytes() should accept version parameter."""
+    mock_gcp_client.access_secret_version.return_value = _mock_response(b"v2-data")
+    result = client.get_bytes("secret", version=2)
+    assert result == b"v2-data"
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/secret/versions/2"
+    )
+
+
+def test_get_bytes_with_default(client, mock_gcp_client):
+    """Test get_bytes() should support default fallback."""
+    mock_gcp_client.access_secret_version.side_effect = NotFound("gone")
+    result = client.get_bytes("missing", default=b"fallback")
+    assert result == b"fallback"
+
+
+def test_get_json_parses_payload(client, mock_gcp_client):
+    """Test get_json() should parse JSON payload."""
+    payload = {"key": "value", "count": 42}
+    mock_gcp_client.access_secret_version.return_value = _mock_response(
+        json.dumps(payload).encode()
+    )
+    result = client.get_json("json-secret")
+    assert result == payload
+
+
+def test_get_json_with_version(client, mock_gcp_client):
+    """Test get_json() should accept version parameter."""
+    mock_gcp_client.access_secret_version.return_value = _mock_response(b'{"v": 5}')
+    result = client.get_json("secret", version=5)
+    assert result == {"v": 5}
+
+
+def test_get_json_with_default(client, mock_gcp_client):
+    """Test get_json() should support default fallback."""
+    mock_gcp_client.access_secret_version.side_effect = NotFound("gone")
+    result = client.get_json("missing", default={"fallback": True})
+    assert result == {"fallback": True}
+
+
+def test_get_dict_parses_env_format(client, mock_gcp_client):
+    """Test get_dict() should parse KEY=VALUE format by default."""
+    env_data = b"DB_HOST=localhost\nDB_PORT=5432\nDB_NAME=mydb"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file")
+    assert result == {"DB_HOST": "localhost", "DB_PORT": "5432", "DB_NAME": "mydb"}
+
+
+def test_get_dict_strips_whitespace_by_default(client, mock_gcp_client):
+    """Test get_dict() should strip keys and values by default."""
+    env_data = b"  KEY1  =  value1  \n  KEY2=value2  "
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file")
+    assert result == {"KEY1": "value1", "KEY2": "value2"}
+
+
+def test_get_dict_with_strip_keys_false(client, mock_gcp_client):
+    """Test get_dict() should preserve key whitespace when strip_keys=False."""
+    env_data = b"  KEY  =value"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file", strip_keys=False)
+    assert result == {"  KEY  ": "value"}
+
+
+def test_get_dict_with_strip_values_false(client, mock_gcp_client):
+    """Test get_dict() should preserve value whitespace when strip_values=False."""
+    env_data = b"KEY=  value  "
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file", strip_values=False)
+    assert result == {"KEY": "  value  "}
+
+
+def test_get_dict_with_uppercase_keys(client, mock_gcp_client):
+    """Test get_dict() should uppercase keys when uppercase_keys=True."""
+    env_data = b"db_host=localhost\napi_key=secret"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file", uppercase_keys=True)
+    assert result == {"DB_HOST": "localhost", "API_KEY": "secret"}
+
+
+def test_get_dict_with_custom_separators(client, mock_gcp_client):
+    """Test get_dict() should accept custom line and key separators."""
+    data = b"KEY1:value1;KEY2:value2"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(data)
+    result = client.get_dict("custom-file", line_separator=";", key_separator=":")
+    assert result == {"KEY1": "value1", "KEY2": "value2"}
+
+
+def test_get_dict_skips_empty_lines(client, mock_gcp_client):
+    """Test get_dict() should skip empty lines."""
+    env_data = b"KEY1=value1\n\nKEY2=value2\n"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file")
+    assert result == {"KEY1": "value1", "KEY2": "value2"}
+
+
+def test_get_dict_skips_lines_without_separator(client, mock_gcp_client):
+    """Test get_dict() should skip lines without key separator."""
+    env_data = b"KEY1=value1\ncomment line\nKEY2=value2"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file")
+    assert result == {"KEY1": "value1", "KEY2": "value2"}
+
+
+def test_get_dict_with_version(client, mock_gcp_client):
+    """Test get_dict() should accept version parameter."""
+    env_data = b"KEY=value"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file", version=3)
+    assert result == {"KEY": "value"}
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/env-file/versions/3"
+    )
+
+
+def test_get_dict_with_default(client, mock_gcp_client):
+    """Test get_dict() should support default fallback."""
+    mock_gcp_client.access_secret_version.side_effect = NotFound("gone")
+    result = client.get_dict("missing", default={"fallback": "value"})
+    assert result == {"fallback": "value"}
+
+
+def test_get_dict_handles_equals_in_value(client, mock_gcp_client):
+    """Test get_dict() should handle = signs in values."""
+    env_data = b"JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload=data"
+    mock_gcp_client.access_secret_version.return_value = _mock_response(env_data)
+    result = client.get_dict("env-file")
+    assert result == {"JWT": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload=data"}
