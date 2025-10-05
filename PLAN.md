@@ -39,11 +39,12 @@ Thin, value-centric slices to deliver the `gcpeasy.secretmanager` module. Unless
 ## Slice 4 – Listing & Metadata Introspection **(independent)**
 - **Goal:** Allow users to explore and audit secrets without fetching payloads.
 - **Scope:**
-  - Implement `Client.list` with optional `filter`, `max_results`, and `fully_qualified` flags.
+  - Implement `Client.secrets` with optional `filter`, `max_results`, and `fully_qualified` flags.
   - Implement `Client.metadata` returning the underlying `Secret` protobuf (or a light wrapper) and `Client.versions` yielding simplified view objects (`version`, `state`, `enabled`, timestamps) with `include_disabled` and pagination support.
   - Add lightweight dataclass/NamedTuple for version summaries.
 - **Deliverables:** Metadata surface enabling discovery and governance workflows.
 - **Tests:** Mock `list_secrets`, `get_secret`, `list_secret_versions` responses; verify filtering passthrough, fully qualified formatting, and version summarisation.
+- **✅ STATUS:** COMPLETE - Implemented `secrets()`, `metadata()`, and `versions()` with `VersionInfo` dataclass. 13 comprehensive tests covering all options and edge cases. README updated with examples.
 
 ## Slice 5 – Secret Handle Abstraction (`Secret` class)
 - **Goal:** Provide per-secret objects enabling method chaining and clearer call sites.

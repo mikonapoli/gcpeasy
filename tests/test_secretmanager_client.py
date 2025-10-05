@@ -670,3 +670,344 @@ def test_get_many_accepts_mappingproxytype(client, mock_gcp_client):
     mock_gcp_client.access_secret_version.assert_called_once_with(
         name="projects/test-project/secrets/secret-id/versions/latest"
     )
+
+
+# Slice 4: Listing & Metadata
+
+
+def test_secrets_returns_secret_ids(client, mock_gcp_client):
+    """Test secrets() should return simple secret IDs by default."""
+    mock_secret1 = Mock()
+    mock_secret1.name = "projects/test-project/secrets/secret1"
+    mock_secret2 = Mock()
+    mock_secret2.name = "projects/test-project/secrets/secret2"
+    mock_gcp_client.list_secrets.return_value = [mock_secret1, mock_secret2]
+
+    result = client.secrets()
+
+    assert result == ["secret1", "secret2"]
+    mock_gcp_client.list_secrets.assert_called_once_with(request={"parent": "projects/test-project"})
+
+
+def test_secrets_with_filter(client, mock_gcp_client):
+    """Test secrets() should pass filter to API."""
+    mock_secret = Mock()
+    mock_secret.name = "projects/test-project/secrets/prod-secret"
+    mock_gcp_client.list_secrets.return_value = [mock_secret]
+
+    result = client.secrets(filter="labels.env=prod")
+
+    assert result == ["prod-secret"]
+    mock_gcp_client.list_secrets.assert_called_once_with(
+        request={"parent": "projects/test-project", "filter": "labels.env=prod"}
+    )
+
+
+def test_secrets_with_max_results(client, mock_gcp_client):
+    """Test secrets() should pass max_results as page_size to API."""
+    mock_secret = Mock()
+    mock_secret.name = "projects/test-project/secrets/secret1"
+    mock_gcp_client.list_secrets.return_value = [mock_secret]
+
+    result = client.secrets(max_results=10)
+
+    assert result == ["secret1"]
+    mock_gcp_client.list_secrets.assert_called_once_with(
+        request={"parent": "projects/test-project", "page_size": 10}
+    )
+
+
+def test_secrets_with_fully_qualified(client, mock_gcp_client):
+    """Test secrets() should return full paths when fully_qualified=True."""
+    mock_secret1 = Mock()
+    mock_secret1.name = "projects/test-project/secrets/secret1"
+    mock_secret2 = Mock()
+    mock_secret2.name = "projects/test-project/secrets/secret2"
+    mock_gcp_client.list_secrets.return_value = [mock_secret1, mock_secret2]
+
+    result = client.secrets(fully_qualified=True)
+
+    assert result == [
+        "projects/test-project/secrets/secret1",
+        "projects/test-project/secrets/secret2"
+    ]
+
+
+def test_secrets_with_all_options(client, mock_gcp_client):
+    """Test secrets() should support all options together."""
+    mock_secret = Mock()
+    mock_secret.name = "projects/test-project/secrets/filtered"
+    mock_gcp_client.list_secrets.return_value = [mock_secret]
+
+    result = client.secrets(filter="labels.team=data", max_results=5, fully_qualified=True)
+
+    assert result == ["projects/test-project/secrets/filtered"]
+    mock_gcp_client.list_secrets.assert_called_once_with(
+        request={
+            "parent": "projects/test-project",
+            "filter": "labels.team=data",
+            "page_size": 5
+        }
+    )
+
+
+def test_secrets_returns_empty_list_when_no_secrets(client, mock_gcp_client):
+    """Test secrets() should return empty list when no secrets exist."""
+    mock_gcp_client.list_secrets.return_value = []
+
+    result = client.secrets()
+
+    assert result == []
+
+
+def test_metadata_returns_secret_protobuf(client, mock_gcp_client):
+    """Test metadata() should return the Secret protobuf."""
+    mock_secret = Mock()
+    mock_secret.name = "projects/test-project/secrets/my-secret"
+    mock_secret.labels = {"env": "prod"}
+    mock_gcp_client.get_secret.return_value = mock_secret
+
+    result = client.metadata("my-secret")
+
+    assert result is mock_secret
+    assert result.name == "projects/test-project/secrets/my-secret"
+    assert result.labels == {"env": "prod"}
+    mock_gcp_client.get_secret.assert_called_once_with(name="projects/test-project/secrets/my-secret")
+
+
+def test_metadata_with_project_prefix(client, mock_gcp_client):
+    """Test metadata() should handle project/secret format."""
+    mock_secret = Mock()
+    mock_secret.name = "projects/other-project/secrets/secret"
+    mock_gcp_client.get_secret.return_value = mock_secret
+
+    result = client.metadata("other-project/secret")
+
+    assert result is mock_secret
+    mock_gcp_client.get_secret.assert_called_once_with(name="projects/other-project/secrets/secret")
+
+
+def test_versions_returns_version_info_list(client, mock_gcp_client):
+    """Test versions() should return list of VersionInfo objects."""
+    mock_state1 = Mock(spec=["name"])
+    mock_state1.name = "ENABLED"
+    mock_v1 = Mock()
+    mock_v1.name = "projects/test-project/secrets/my-secret/versions/1"
+    mock_v1.state = mock_state1
+    mock_v1.create_time = "2024-01-01T00:00:00Z"
+
+    mock_state2 = Mock(spec=["name"])
+    mock_state2.name = "ENABLED"
+    mock_v2 = Mock()
+    mock_v2.name = "projects/test-project/secrets/my-secret/versions/2"
+    mock_v2.state = mock_state2
+    mock_v2.create_time = "2024-01-02T00:00:00Z"
+
+    mock_gcp_client.list_secret_versions.return_value = [mock_v1, mock_v2]
+
+    result = client.versions("my-secret")
+
+    assert len(result) == 2
+    assert result[0].version == "1"
+    assert result[0].state == "ENABLED"
+    assert result[0].enabled is True
+    assert result[0].create_time == "2024-01-01T00:00:00Z"
+    assert result[1].version == "2"
+    mock_gcp_client.list_secret_versions.assert_called_once_with(
+        parent="projects/test-project/secrets/my-secret"
+    )
+
+
+def test_versions_excludes_disabled_by_default(client, mock_gcp_client):
+    """Test versions() should exclude disabled versions by default."""
+    mock_state1 = Mock(spec=["name"])
+    mock_state1.name = "ENABLED"
+    mock_v1 = Mock()
+    mock_v1.name = "projects/test-project/secrets/my-secret/versions/1"
+    mock_v1.state = mock_state1
+    mock_v1.create_time = "2024-01-01T00:00:00Z"
+
+    mock_state2 = Mock(spec=["name"])
+    mock_state2.name = "DISABLED"
+    mock_v2 = Mock()
+    mock_v2.name = "projects/test-project/secrets/my-secret/versions/2"
+    mock_v2.state = mock_state2
+    mock_v2.create_time = "2024-01-02T00:00:00Z"
+
+    mock_gcp_client.list_secret_versions.return_value = [mock_v1, mock_v2]
+
+    result = client.versions("my-secret")
+
+    assert len(result) == 1
+    assert result[0].version == "1"
+    assert result[0].enabled is True
+
+
+def test_versions_includes_disabled_when_requested(client, mock_gcp_client):
+    """Test versions() should include disabled versions when include_disabled=True."""
+    mock_state1 = Mock(spec=["name"])
+    mock_state1.name = "ENABLED"
+    mock_v1 = Mock()
+    mock_v1.name = "projects/test-project/secrets/my-secret/versions/1"
+    mock_v1.state = mock_state1
+    mock_v1.create_time = "2024-01-01T00:00:00Z"
+
+    mock_state2 = Mock(spec=["name"])
+    mock_state2.name = "DISABLED"
+    mock_v2 = Mock()
+    mock_v2.name = "projects/test-project/secrets/my-secret/versions/2"
+    mock_v2.state = mock_state2
+    mock_v2.create_time = "2024-01-02T00:00:00Z"
+
+    mock_gcp_client.list_secret_versions.return_value = [mock_v1, mock_v2]
+
+    result = client.versions("my-secret", include_disabled=True)
+
+    assert len(result) == 2
+    assert result[0].enabled is True
+    assert result[1].enabled is False
+
+
+def test_versions_handles_destroy_time(client, mock_gcp_client):
+    """Test versions() should include destroy_time when present."""
+    mock_state = Mock(spec=["name"])
+    mock_state.name = "DESTROYED"
+    mock_v1 = Mock()
+    mock_v1.name = "projects/test-project/secrets/my-secret/versions/1"
+    mock_v1.state = mock_state
+    mock_v1.create_time = "2024-01-01T00:00:00Z"
+    mock_v1.destroy_time = "2024-01-03T00:00:00Z"
+
+    mock_gcp_client.list_secret_versions.return_value = [mock_v1]
+
+    result = client.versions("my-secret", include_disabled=True)
+
+    assert len(result) == 1
+    assert result[0].state == "DESTROYED"
+    assert result[0].destroy_time == "2024-01-03T00:00:00Z"
+
+
+def test_versions_returns_empty_list_when_no_versions(client, mock_gcp_client):
+    """Test versions() should return empty list when no versions exist."""
+    mock_gcp_client.list_secret_versions.return_value = []
+
+    result = client.versions("my-secret")
+
+    assert result == []
+
+
+# Slice 5: Secret Handle Abstraction
+
+def test_client_secret_returns_secret_instance(client):
+    """Test Client.secret() should return a Secret instance."""
+    from gcpeasy.secretmanager.client import Secret
+
+    secret = client.secret("api-key")
+
+    assert isinstance(secret, Secret)
+    assert secret.id == "api-key"
+    assert secret.project_id == "test-project"
+
+
+def test_secret_path_property_returns_fully_qualified_path(client):
+    """Test Secret.path property should return fully qualified resource path."""
+    secret = client.secret("api-key")
+
+    assert secret.path == "projects/test-project/secrets/api-key"
+
+
+def test_secret_handles_project_in_identifier(client):
+    """Test Secret should extract project from identifier."""
+    secret = client.secret("other-project/shared-key")
+
+    assert secret.id == "shared-key"
+    assert secret.project_id == "other-project"
+    assert secret.path == "projects/other-project/secrets/shared-key"
+
+
+def test_secret_handles_fully_qualified_path(client):
+    """Test Secret should extract project and ID from fully qualified path."""
+    secret = client.secret("projects/acme/secrets/legacy-key/versions/3")
+
+    assert secret.id == "legacy-key"
+    assert secret.project_id == "acme"
+    assert secret.path == "projects/acme/secrets/legacy-key"
+
+
+def test_secret_call_delegates_to_client(client, mock_gcp_client):
+    """Test Secret.__call__() should delegate to client.get()."""
+    mock_response = Mock()
+    mock_response.payload.data = b"secret-value"
+    mock_gcp_client.access_secret_version.return_value = mock_response
+
+    secret = client.secret("api-key")
+    result = secret()
+
+    assert result == "secret-value"
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/api-key/versions/latest"
+    )
+
+
+def test_secret_get_delegates_to_client(client, mock_gcp_client):
+    """Test Secret.get() should delegate to client.get()."""
+    mock_response = Mock()
+    mock_response.payload.data = b"secret-value"
+    mock_gcp_client.access_secret_version.return_value = mock_response
+
+    secret = client.secret("api-key")
+    result = secret.get(version=2, as_json=False)
+
+    assert result == "secret-value"
+    mock_gcp_client.access_secret_version.assert_called_once_with(
+        name="projects/test-project/secrets/api-key/versions/2"
+    )
+
+
+def test_secret_get_bytes_delegates_to_client(client, mock_gcp_client):
+    """Test Secret.get_bytes() should delegate to client.get_bytes()."""
+    mock_response = Mock()
+    mock_response.payload.data = b"binary-data"
+    mock_gcp_client.access_secret_version.return_value = mock_response
+
+    secret = client.secret("signing-key")
+    result = secret.get_bytes()
+
+    assert result == b"binary-data"
+
+
+def test_secret_get_json_delegates_to_client(client, mock_gcp_client):
+    """Test Secret.get_json() should delegate to client.get_json()."""
+    mock_response = Mock()
+    mock_response.payload.data = b'{"key": "value"}'
+    mock_gcp_client.access_secret_version.return_value = mock_response
+
+    secret = client.secret("config")
+    result = secret.get_json()
+
+    assert result == {"key": "value"}
+
+
+def test_secret_get_dict_delegates_to_client(client, mock_gcp_client):
+    """Test Secret.get_dict() should delegate to client.get_dict()."""
+    mock_response = Mock()
+    mock_response.payload.data = b"KEY1=value1\nKEY2=value2"
+    mock_gcp_client.access_secret_version.return_value = mock_response
+
+    secret = client.secret("env-config")
+    result = secret.get_dict()
+
+    assert result == {"KEY1": "value1", "KEY2": "value2"}
+
+
+def test_secret_independent_from_client_mutations(client, mock_gcp_client):
+    """Test Secret should be independent from subsequent client mutations."""
+    secret = client.secret("api-key")
+    original_project = secret.project_id
+
+    # Mutate client
+    client.project_id = "different-project"
+
+    # Secret should retain original project
+    assert secret.project_id == original_project
+    assert secret.path == f"projects/{original_project}/secrets/api-key"

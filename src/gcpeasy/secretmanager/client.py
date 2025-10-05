@@ -1,8 +1,11 @@
 """Secret Manager client implementation."""
 
+from __future__ import annotations
+
 import json
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from google.api_core.exceptions import NotFound
@@ -10,11 +13,22 @@ from google.cloud import secretmanager
 
 if TYPE_CHECKING:
     from google.cloud.secretmanager import SecretManagerServiceClient
+    from google.cloud.secretmanager_v1.types import Secret, SecretVersion
 
 _UNSET = object()
 _SECRET_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,254}$")
 _PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]*[a-z0-9]$")
 _VERSION_KEYWORDS = {"latest", "latest:enabled"}
+
+
+@dataclass
+class VersionInfo:
+    """Summary information about a secret version."""
+    version: str
+    state: str
+    enabled: bool
+    create_time: Any
+    destroy_time: Any | None = None
 
 
 def _validate_secret_id(secret_id: str) -> None:
@@ -77,6 +91,73 @@ def _normalize_secret_path(identifier: str, project_id: str) -> tuple[str, str, 
         return proj, sec, None
 
     return project_id, identifier, None
+
+
+class Secret:
+    """Handle for a specific secret, pinning the secret ID across operations."""
+
+    def __init__(self, client: "Client", secret_id: str, project_id: str):
+        self._client = client
+        self.id = secret_id
+        self.project_id = project_id
+
+    @property
+    def path(self) -> str:
+        """Fully qualified secret path."""
+        return f"projects/{self.project_id}/secrets/{self.id}"
+
+    def __call__(
+        self,
+        *,
+        version: str | int | None = None,
+        as_json: bool = False,
+        as_bytes: bool = False,
+        default: Any = _UNSET,
+    ) -> Any:
+        """Retrieve this secret's value."""
+        return self._client.get(self.path, version=version, as_json=as_json, as_bytes=as_bytes, default=default)
+
+    def get(
+        self,
+        *,
+        version: str | int | None = None,
+        as_json: bool = False,
+        as_bytes: bool = False,
+        default: Any = _UNSET,
+    ) -> Any:
+        """Retrieve this secret's value."""
+        return self._client.get(self.path, version=version, as_json=as_json, as_bytes=as_bytes, default=default)
+
+    def get_bytes(self, *, version: str | int | None = None, default: Any = _UNSET) -> bytes:
+        """Retrieve this secret as raw bytes."""
+        return self._client.get_bytes(self.path, version=version, default=default)
+
+    def get_json(self, *, version: str | int | None = None, default: Any = _UNSET) -> Any:
+        """Retrieve this secret and parse as JSON."""
+        return self._client.get_json(self.path, version=version, default=default)
+
+    def get_dict(
+        self,
+        *,
+        version: str | int | None = None,
+        line_separator: str = "\n",
+        key_separator: str = "=",
+        strip_keys: bool = True,
+        strip_values: bool = True,
+        uppercase_keys: bool = False,
+        default: Any = _UNSET,
+    ) -> dict[str, str]:
+        """Retrieve this secret as dict by parsing KEY=VALUE pairs."""
+        return self._client.get_dict(
+            self.path,
+            version=version,
+            line_separator=line_separator,
+            key_separator=key_separator,
+            strip_keys=strip_keys,
+            strip_values=strip_values,
+            uppercase_keys=uppercase_keys,
+            default=default,
+        )
 
 
 class Client:
@@ -231,6 +312,69 @@ class Client:
             f"Invalid spec type for {alias!r}: expected str, tuple, or dict, got {type(spec).__name__}"
         )
 
+    def secrets(self, *, filter: str | None = None, max_results: int | None = None, fully_qualified: bool = False) -> list[str]:
+        """List secret IDs in the project."""
+        from itertools import islice
+
+        parent = f"projects/{self.project_id}"
+        request = {"parent": parent}
+        if filter:
+            request["filter"] = filter
+        if max_results is not None:
+            request["page_size"] = max_results
+
+        secret_list = self._gcp.list_secrets(request=request)
+        if max_results is not None:
+            secret_list = islice(secret_list, max_results)
+
+        if fully_qualified:
+            return [s.name for s in secret_list]
+
+        return [s.name.split("/")[-1] for s in secret_list]
+
+    def metadata(self, secret: str) -> "Secret":
+        """Fetch secret metadata without retrieving payload."""
+        proj, sec, _ = _normalize_secret_path(secret, self.project_id)
+        _validate_project_id(proj)
+        _validate_secret_id(sec)
+
+        name = f"projects/{proj}/secrets/{sec}"
+        return self._gcp.get_secret(name=name)
+
+    def versions(self, secret: str, *, include_disabled: bool = False) -> list[VersionInfo]:
+        """List version information for a secret."""
+        proj, sec, _ = _normalize_secret_path(secret, self.project_id)
+        _validate_project_id(proj)
+        _validate_secret_id(sec)
+
+        parent = f"projects/{proj}/secrets/{sec}"
+        versions = self._gcp.list_secret_versions(parent=parent)
+
+        result = []
+        for v in versions:
+            # Handle both enum objects and plain strings/ints
+            if hasattr(v.state, "name"):
+                state_name = v.state.name
+            elif isinstance(v.state, str):
+                state_name = v.state
+            else:
+                state_name = str(v.state)
+
+            enabled = state_name == "ENABLED"
+
+            if not include_disabled and not enabled:
+                continue
+
+            result.append(VersionInfo(
+                version=v.name.split("/")[-1],
+                state=state_name,
+                enabled=enabled,
+                create_time=v.create_time,
+                destroy_time=getattr(v, "destroy_time", None),
+            ))
+
+        return result
+
     def get_path(self, path: str, *, as_json: bool = False, as_bytes: bool = False, default: Any = _UNSET) -> Any:
         """Fetch a fully qualified resource path without project inference."""
         if not path.startswith("projects/"):
@@ -254,6 +398,13 @@ class Client:
         if as_json:
             return json.loads(text)
         return text
+
+    def secret(self, identifier: str) -> Secret:
+        """Get a handle for a specific secret."""
+        proj, sec, _ = _normalize_secret_path(identifier, self.project_id)
+        _validate_project_id(proj)
+        _validate_secret_id(sec)
+        return Secret(self, sec, proj)
 
 
 def init(project_id: str | None = None, project_number: str | int | None = None, default_version: str = "latest", default_encoding: str = "utf-8") -> Client:

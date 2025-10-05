@@ -26,7 +26,7 @@ token = client("optional-token", default=None)
 - **Flexible identifiers:** Accepts plain IDs, `project/secret` pairs, or fully qualified paths (`projects/.../secrets/.../versions/...`).
 - **Deterministic defaults:** Location comes from ADC project; version defaults to `latest`; encoding defaults to UTF-8.
 - **Fallbacks without surprises:** Pass `default=` (even `None`) to suppress `NotFound`. All other errors bubble up.
-- **Immediate results:** Helpers return Python primitives instead of protobufs. Drop down to `_gcp` for advanced usage.
+- **Immediate results:** Helpers return Python primitives instead of protobufs. Drop down to the underlying SDK client (stored in the `_gcp` attribute) for advanced usage.
 
 ## Initialization
 
@@ -53,7 +53,7 @@ client = sm.init(
 - `project_id` wins if both `project_id` and `project_number` are provided.
 - Without explicit project info, we call `google.auth.default()` and use the discovered project. If the ADC environment lacks a project, `init()` raises a descriptive `ValueError`.
 - Numeric project identifiers (e.g., `"123456"`) are accepted anywhere a project ID is expected.
-- Pass `_gcp=<SecretManagerServiceClient>` to reuse an existing SDK client; otherwise one is created automatically.
+- In tests, monkeypatch `google.cloud.secretmanager.SecretManagerServiceClient` before calling `sm.init()` to inject fakes or emulator-backed clients.
 
 ## Retrieving Secrets
 
@@ -132,6 +132,45 @@ Behaviour summary:
 - Each entry is fetched sequentially via `get()`, so all format flags, defaults, and version rules apply consistently.
 - `default` handling for individual entries works the same as single-call retrieval: `NotFound` returns the provided fallback, other errors propagate.
 
+## Listing & Metadata Introspection
+
+```python
+# List all secret IDs in the current project
+all_secrets = client.secrets()
+# ['api-key', 'db-password', 'service-account']
+
+# Filter by labels
+prod_secrets = client.secrets(filter="labels.env=prod")
+
+# Limit results
+recent = client.secrets(max_results=10)
+
+# Get fully qualified resource names
+paths = client.secrets(fully_qualified=True)
+# ['projects/my-project/secrets/api-key', ...]
+
+# Fetch metadata without retrieving payload
+meta = client.metadata("api-key")
+print(meta.name, meta.labels, meta.replication)
+
+# List version information
+versions = client.versions("api-key")
+for v in versions:
+    print(f"Version {v.version}: {v.state} (enabled={v.enabled})")
+    print(f"  Created: {v.create_time}")
+
+# Include disabled/destroyed versions
+all_versions = client.versions("api-key", include_disabled=True)
+```
+
+Key behaviours:
+- `secrets()` returns simple secret IDs by default. Set `fully_qualified=True` for full resource paths.
+- `filter` accepts Secret Manager's filter syntax (e.g., `labels.team=platform`).
+- `max_results` translates to `page_size` in the underlying API call.
+- `metadata()` returns the raw `Secret` protobuf from the API, giving access to replication config, labels, timestamps, etc.
+- `versions()` returns a list of `VersionInfo` dataclasses with `version`, `state`, `enabled`, `create_time`, and optional `destroy_time`.
+- By default, `versions()` excludes disabled/destroyed versions. Pass `include_disabled=True` to see everything.
+
 ## Working with Fully Qualified Paths
 
 ```python
@@ -149,6 +188,37 @@ missing = client.get_path(
 - `get_path` skips identifier inference entirely and requires the path to start with `projects/`.
 - Shares the same `as_json`, `as_bytes`, and `default` semantics as `get`.
 
+## Secret Objects
+
+Get a handle for a specific secret that pins the secret ID across operations:
+
+```python
+# Get a Secret handle
+secret = client.secret("github-token")
+
+# Attributes
+secret.id          # "github-token"
+secret.path        # "projects/my-project/secrets/github-token"
+secret.project_id  # "my-project"
+
+# Retrieve values using the same methods as the client
+current = secret()                        # latest version as string
+payload = secret(version=2, as_json=True)
+raw = secret.get_bytes()
+env_vars = secret.get_dict()
+
+# Cross-project secrets
+shared = client.secret("shared-project/shared-secret")
+shared.id          # "shared-secret"
+shared.project_id  # "shared-project"
+```
+
+Key behaviours:
+- `client.secret()` normalizes the identifier immediately, extracting project and secret ID
+- The returned `Secret` object delegates all read operations to the parent client while pinning the secret ID
+- Secret handles are independent from subsequent client mutations
+- All client-level read methods (`__call__`, `get`, `get_bytes`, `get_json`, `get_dict`) are available on Secret objects with the same signatures (minus the `secret` parameter)
+
 ## Identifier & Version Rules
 
 - Secret IDs must be 1–255 characters, start with a letter or digit, and may include letters, digits, `_`, or `-` thereafter. Underscore-prefixed IDs (`_secret`) are rejected to match Google’s API contract.
@@ -165,16 +235,15 @@ missing = client.get_path(
 ## Underlying Client Access
 
 ```python
-sdk = client._gcp
-response = sdk.access_secret_version(name="projects/acme/secrets/raw/versions/1")
+sdk_client = client._gcp
+response = sdk_client.access_secret_version(name="projects/acme/secrets/raw/versions/1")
 ```
 
 - `_gcp` exposes the original `SecretManagerServiceClient` for operations not yet wrapped by gcpeasy.
-- All helper methods rely on this client, so injected doubles make unit testing straightforward (`sm.init(_gcp=fake_client)`).
+- To override it in tests, monkeypatch `SecretManagerServiceClient` before calling `sm.init()`.
 
 ## Testing Tips
 
-- Use dependency injection to hand in a mock `_gcp` client and simulate `access_secret_version` responses and exceptions.
 - Remember that only `NotFound` is caught when a `default` is supplied—other exceptions should be asserted explicitly in your tests.
 - When exercising `get_many`, pass sentinel defaults per entry to keep assertions precise.
 
