@@ -1,3 +1,5 @@
 """Secret Manager utilities for gcpeasy."""
 
-__all__ = []
+from .client import Client, init
+
+__all__ = ["Client", "init"]
